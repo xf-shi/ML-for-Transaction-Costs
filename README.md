@@ -33,7 +33,7 @@ The general variables and the market parameters in the code are summarized below
 ## FBSDE solver
 For the detailed implementation of the FBSDE solver, see [`Script/sample_code_FBSDE.py`](./Script/sample_code_FBSDE.py);      
 The core dynamic is defined in the method `System.forward()`, and the key variables in the code are summarized below:   
-Variable | Meaning 
+| Variable | Meaning |
 | --- | --- |
 | `time_step` | time discretization, N |
 | `n_samples` | number of sample path, batch_size |

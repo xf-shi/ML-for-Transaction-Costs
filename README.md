@@ -21,7 +21,7 @@ Variable | Meaning
  `S_OUTSTANDING` | total shares in the market, s
  `TIME` | trading horizon, T
  `TIME_STEP` |   time discretization, N
- `DT ` | <img src="https://latex.codecogs.com/gif.latex?\Delta t=\frac{T}{N}" /> 
+ `DT ` | <img src="https://latex.codecogs.com/gif.latex?\Delta%20t=\frac{T}{N}" /> 
  `GAMMA` | risk aversion, <img src="https://latex.codecogs.com/gif.latex?\gamma" />
  `XI_1` | endowment parameter, <img src="https://latex.codecogs.com/gif.latex?\hat{\xi}" />
  `PHI_INITIAL` | initial holding,  <img src="https://latex.codecogs.com/gif.latex?\varphi_{0-}" />
@@ -37,7 +37,7 @@ Variable | Meaning
 --- | --- 
 `time_step` | time discretization, N
 `n_samples` | number of sample path, batch_size
- `dW_t`  | iid normally distributed random variables with mean zero and variance <img src="https://latex.codecogs.com/gif.latex?\Delta t" />, <img src="https://latex.codecogs.com/gif.latex?\Delta W_t" /> 
+ `dW_t`  | iid normally distributed random variables with mean zero and variance <img src="https://latex.codecogs.com/gif.latex?\Delta%20t" />, <img src="https://latex.codecogs.com/gif.latex?\Delta%20W_t" /> 
  `W_t` | Brownian motion at time t, <img src="https://latex.codecogs.com/gif.latex?W_t" /> 
   `XI_t` | Brownian motion at time t, <img src="https://latex.codecogs.com/gif.latex?W_t" />
   `sigma_t` | vector of 0
@@ -47,7 +47,7 @@ Variable | Meaning
   `Lam_t` | 1
   `in_t` | input of the neural network <img src="https://latex.codecogs.com/gif.latex?F^{\theta} " />
    `sigmaZ_t` | output of the neural network <img src="https://latex.codecogs.com/gif.latex?F^{\theta} " />,  <img src="https://latex.codecogs.com/gif.latex?Z_{t} " />
- `Delta_t` | difference between the frictional and frictionless positions (the **forward component**) divided by the endowment parameter, <img src="https://latex.codecogs.com/gif.latex?{\hat{\xi}}^{-1} * \Delta \varphi_t " /> 
+ `Delta_t` | difference between the frictional and frictionless positions (the **forward component**) divided by the endowment parameter, <img src="https://latex.codecogs.com/gif.latex?{\hat{\xi}}^{-1}*\Delta%20\varphi_t " /> 
  `Z_t` | the **backward component**, <img src="https://latex.codecogs.com/gif.latex?Y_t " /> 
 
 

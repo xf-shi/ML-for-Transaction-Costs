@@ -99,7 +99,6 @@ loss_arr_Q=result_Q['loss']
 # the leading order ODE is solved by Mathematica and the solution TABLE is stored in EVA.txt and X.txt
 pathEVA='../Data/'
 EVA=np.loadtxt(pathEVA+"EVA.txt") #value of g(x) of TABLE
-XXX=np.loadtxt(pathEVA+"X.txt") #value of x of TABLE
 EVA=np.vstack((np.linspace(0,50,EVA.shape[0]), EVA)).T
 XM=50
 def g_q_Mathematica(x):

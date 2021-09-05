@@ -69,10 +69,20 @@ The core dynamic of the Deep Q-learning is defined in the function `TRAIN_Utilit
 | `loss_Utility` | minus goal function, <img src="https://latex.codecogs.com/gif.latex?-J_T(\dot{\varphi})" /> |
 
 ## Example
-Here we proivde an example for the quadratic cost case (`q=2`).    
+Here we proivde an example for the quadratic cost case (`q=2`) with the trading horizon of 21 days (`TIME=21`).    
 <br/>
-With the trading horizon of 21 days (`TIME=21`) discretized in 168 time steps (`TIME_STEP=168`), the agent risk aversion is set to be <img src="https://latex.codecogs.com/gif.latex?1.66\times10^{-13}"/> (`GAMMA=1.66*1e-13`), and the total shares outstanding in the market is <img src="https://latex.codecogs.com/gif.latex?2.46\times10^{11}"/> (`S_OUTSTANDING=2.46*1e11`). The stock return is <img src="https://latex.codecogs.com/gif.latex?\mu=0.5\times\gamma\times\sigma^2"/> (`MU_BAR=0.5*GAMMA*ALPHA**2`) with the stock volatility of 1.88 (`ALPHA=1.88`). The endowment
-volatility parameter takes the value of <img src="https://latex.codecogs.com/gif.latex?2.19\times10^{10}"/> (`XI_1=2.19*1e10`) and the trading cost parameter takes the value of  <img src="https://latex.codecogs.com/gif.latex?1.08\times10^{-10}"/> (`LAM=1.08*1e-10`). And these lead to the optimal trading rate (left panel) and the optimal position (right panel) leanrt by the FBSDE solver and the Deep Q-learning, as well as the ground truth and the Leading-order solution based on the asymptotic formula, as illustrated below:
+The trading horizon is discretized in 168 time steps (`TIME_STEP=168`). And the parameters is outlined below:
+
+| Parameter | Value | Code | 
+| --- | ---  | --- | 
+| agent risk aversion  | <img src="https://latex.codecogs.com/gif.latex?\gamma=1.66\times10^{-13}"/> | `GAMMA=1.66*1e-13` | 
+|total shares outstanding |<img src="https://latex.codecogs.com/gif.latex?s=2.46\times10^{11}"/> | `S_OUTSTANDING=2.46*1e11` |
+|stock volatility  |<img src="https://latex.codecogs.com/gif.latex?\sigma=1.88"/>  | `ALPHA=1.88`|
+| stock return|<img src="https://latex.codecogs.com/gif.latex?\mu=0.5\times\gamma\times\sigma^2"/> |`MU_BAR=0.5*GAMMA*ALPHA**2` |
+| endowment volatility parameter | <img src="https://latex.codecogs.com/gif.latex?\hat{\xi}=2.19\times10^{10}" />| `XI_1=2.19*1e10` |
+| trading cost parameter |<img src="https://latex.codecogs.com/gif.latex?\lambda=1.08\times10^{-10}"/> | `LAM=1.08*1e-10`|
+
+And these lead to the optimal trading rate (left panel) and the optimal position (right panel) illustrated below, leanrt by the FBSDE solver and the Deep Q-learning, as well as the ground truth and the Leading-order solution based on the asymptotic formula:
 ![TR=21_q=2](./Gallery/Single_TR=21_q=2_calibrated_parameter.png)
 <br/>
 With the same simulation with test batch size of 3000 (`test_samples=3000`), the expectation and the standard deviation of the goal function <img src="https://latex.codecogs.com/gif.latex?J_T(\dot{\varphi})"/> and the mean square error of the terminal trading rate are calculated, as summarized below:

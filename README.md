@@ -82,7 +82,8 @@ The trading horizon is discretized in 168 time steps (`TIME_STEP=168`). And the 
 | endowment volatility parameter | <img src="https://latex.codecogs.com/gif.latex?\hat{\xi}=2.19\times10^{10}" />| `XI_1=2.19*1e10` |
 | trading cost parameter |<img src="https://latex.codecogs.com/gif.latex?\lambda=1.08\times10^{-10}"/> | `LAM=1.08*1e-10`|
 
-And these lead to the optimal trading rate (left panel) and the optimal position (right panel) illustrated below, leanrt by the FBSDE solver and the Deep Q-learning, as well as the ground truth and the Leading-order solution based on the asymptotic formula:
+And these lead to the optimal trading rate (left panel) and the optimal position (right panel) illustrated below, leanrt by the FBSDE solver and the Deep Q-learning, as well as the ground truth and the Leading-order solution based on the asymptotic formula:   
+
 ![TR=21_q=2](./Gallery/Single_TR=21_q=2_calibrated_parameter.png)
 <br/>
 With the same simulation with test batch size of 3000 (`test_samples=3000`), the expectation and the standard deviation of the goal function <img src="https://latex.codecogs.com/gif.latex?J_T(\dot{\varphi})"/> and the mean square error of the terminal trading rate are calculated, as summarized below:

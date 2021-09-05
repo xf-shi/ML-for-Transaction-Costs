@@ -4,29 +4,29 @@ import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
 
-def Mean_Utility_on_s(XI_W_on_s,PHI_on_s,PHI_dot_on_s,S_OUTSTANDING,GAMMA,LAM,MU_BAR,ALPHA,TIME):
+def Mean_Utility_on_s(XI_W_on_s,PHI_on_s,PHI_dot_on_s,q,S_OUTSTANDING,GAMMA,LAM,MU_BAR,ALPHA,TIME):
     """Calculate the mean of the Minus Utility
     XI_on_s: (SAMPLE_SIZE,1,TIME_STEP) 
     PHI_on_s: (SAMPLE_SIZE,TIME_STEP+1) 
     PHI_dot_on_s: (SAMPLE_SIZE,TIME_STEP) """
     C_1=S_OUTSTANDING*GAMMA/2
-    C_2=(S_OUTSTANDING)*LAM/2
+    C_2=(S_OUTSTANDING)**(q-1)*LAM/q
     totalT = XI_W_on_s.shape[-1]-1
     totalN = XI_W_on_s.shape[0]
-    loss = -torch.sum(MU_BAR*PHI_on_s[:,:-1],1) + C_1*torch.sum((ALPHA*PHI_on_s[:,:-1]+XI_W_on_s[:,:-1])**2,1) + C_2*torch.sum((torch.abs(PHI_dot_on_s))**(2),1)
+    loss = -torch.sum(MU_BAR*PHI_on_s[:,:-1],1) + C_1*torch.sum((ALPHA*PHI_on_s[:,:-1]+XI_W_on_s[:,:-1])**2,1) + C_2*torch.sum((torch.abs(PHI_dot_on_s))**(q),1)
     loss = loss*TIME/totalT
     return torch.mean(loss)
 
-def SD_Utility_on_s(XI_W_on_s,PHI_on_s,PHI_dot_on_s,S_OUTSTANDING,GAMMA,LAM,MU_BAR,ALPHA,TIME):
+def SD_Utility_on_s(XI_W_on_s,PHI_on_s,PHI_dot_on_s,q,S_OUTSTANDING,GAMMA,LAM,MU_BAR,ALPHA,TIME):
     """Calculate the standard deviation of the Minus Utility
     XI_on_s: (SAMPLE_SIZE,1,TIME_STEP) 
     PHI_on_s: (SAMPLE_SIZE,TIME_STEP+1) 
     PHI_dot_on_s: (SAMPLE_SIZE,TIME_STEP) """
     C_1=S_OUTSTANDING*GAMMA/2
-    C_2=(S_OUTSTANDING)*LAM/2
+    C_2=(S_OUTSTANDING)**(q-1)*LAM/q
     totalT = XI_W_on_s.shape[-1]-1
     totalN = XI_W_on_s.shape[0]
-    loss = -torch.sum(MU_BAR*PHI_on_s[:,:-1],1) + C_1*torch.sum((ALPHA*PHI_on_s[:,:-1]+XI_W_on_s[:,:-1])**2,1) + C_2*torch.sum((torch.abs(PHI_dot_on_s))**(2),1)
+    loss = -torch.sum(MU_BAR*PHI_on_s[:,:-1],1) + C_1*torch.sum((ALPHA*PHI_on_s[:,:-1]+XI_W_on_s[:,:-1])**2,1) + C_2*torch.sum((torch.abs(PHI_dot_on_s))**(q),1)
     loss = loss*TIME/totalT
     return torch.std(loss)
 
@@ -74,10 +74,10 @@ class RL_Net(nn.Module):
 INPUT_DIM_Utility = 3 #The dimension of the input is 3: phi_t, XI_t, t
 OUTPUT_DIM = 1
 
-def TRAIN_Utility(train_on_gpu,path_Q,XI,PHI_INITIAL,S_OUTSTANDING,GAMMA,LAM,MU_BAR,ALPHA,TIME,EPOCH,N,T,HIDDEN_DIM_Utility,loading,LR_Utility,saving=0,LR_Adjust=dict(),OPT_Utility="ADAM",SEED_Utility1=0,SEED_Utility2=0):
+def TRAIN_Utility(train_on_gpu,path_Q,XI,PHI_INITIAL,q,S_OUTSTANDING,GAMMA,LAM,MU_BAR,ALPHA,TIME,EPOCH,n_samples,time_step,HIDDEN_DIM_Utility,loading,LR_Utility,saving=0,LR_Adjust=dict(),OPT_Utility="ADAM",SEED_Utility1=0,SEED_Utility2=0):
     """
-    N: path size of the Brownian Motion
-    T: discretization step
+    n_samples: path size of the Brownian Motion
+    time_step: discretization step
     loading: If True, then load the previous models from path
     LR_Utility: initial learning rate
     saving: list, to indicate at which epoch should have the models be saved to the path_temp
@@ -89,7 +89,7 @@ def TRAIN_Utility(train_on_gpu,path_Q,XI,PHI_INITIAL,S_OUTSTANDING,GAMMA,LAM,MU_
     ### loading 
     if loading:
         model_list_Utility = []
-        for t in range(T):
+        for t in range(time_step):
             model = RL_Net(INPUT_DIM_Utility,OUTPUT_DIM,HIDDEN_DIM_Utility)
             model.load_state_dict(torch.load(path_Q+'Utility_para{}.pkl'.format(t),map_location=torch.device('cpu')))
             if train_on_gpu:
@@ -107,7 +107,7 @@ def TRAIN_Utility(train_on_gpu,path_Q,XI,PHI_INITIAL,S_OUTSTANDING,GAMMA,LAM,MU_
         loss_arr_Utility=torch.load(path_Q+"Utility_LOSS_arr.pt",map_location=torch.device('cpu'))    
     else:
         model_list_Utility = []
-        for _ in range(T):
+        for _ in range(time_step):
             model = RL_Net(INPUT_DIM_Utility,OUTPUT_DIM,HIDDEN_DIM_Utility)
             model.apply(weights_init_uniform_rule)
             if train_on_gpu:
@@ -122,8 +122,8 @@ def TRAIN_Utility(train_on_gpu,path_Q,XI,PHI_INITIAL,S_OUTSTANDING,GAMMA,LAM,MU_
                             for par in model.parameters()),
                             lr=LR_Utility, betas=(0.9, 0.99))
         loss_arr_Utility = []  
-    PHI_0_on_s=torch.ones(N)*PHI_INITIAL/S_OUTSTANDING
-    DUMMY_1 = torch.ones(N).reshape((N, 1))
+    PHI_0_on_s=torch.ones(n_samples)*PHI_INITIAL/S_OUTSTANDING
+    DUMMY_1 = torch.ones(n_samples).reshape((n_samples, 1))
     if train_on_gpu:
         PHI_0_on_s = PHI_0_on_s.to(device="cuda")
         DUMMY_1 = DUMMY_1.to(device="cuda")
@@ -135,31 +135,31 @@ def TRAIN_Utility(train_on_gpu,path_Q,XI,PHI_INITIAL,S_OUTSTANDING,GAMMA,LAM,MU_
                 g['lr'] = LR_Utility*DECAY
 
         ### XI_W: (SAMPLE_SIZE,TIME_STEP+1)
-        W=torch.cumsum(torch.normal(0, np.sqrt(TIME*1/T), size=(N, T)), dim=1) 
-        W=torch.cat((torch.zeros((N,1)),W),dim=1) 
+        W=torch.cumsum(torch.normal(0, np.sqrt(TIME*1/time_step), size=(n_samples, time_step)), dim=1) 
+        W=torch.cat((torch.zeros((n_samples,1)),W),dim=1) 
         XI_W_on_s = XI* W /S_OUTSTANDING
         if train_on_gpu:
             XI_W_on_s = XI_W_on_s.to(device="cuda")
                     
         optimizer_Utility.zero_grad()
-        PHI_on_s = torch.zeros((N, T + 1))
+        PHI_on_s = torch.zeros((n_samples, time_step + 1))
         if train_on_gpu:
             PHI_on_s = PHI_on_s.to(device="cuda")
         PHI_on_s[:,0] = PHI_on_s[:,0]+PHI_0_on_s.reshape((-1,))
 
-        PHI_dot_on_s = torch.zeros((N, T ))
+        PHI_dot_on_s = torch.zeros((n_samples, time_step ))
         if train_on_gpu:
             PHI_dot_on_s = PHI_dot_on_s.to(device="cuda")       
-        for t in range(T):
+        for t in range(time_step):
           if train_on_gpu:
-              t_tensor=t/T*TIME*torch.ones(N).reshape(-1,1).cuda()            
+              t_tensor=t/time_step*TIME*torch.ones(n_samples).reshape(-1,1).cuda()            
               x_Utility=torch.cat((PHI_on_s[:,t].reshape(-1,1),XI_W_on_s[:,t].reshape(-1,1),t_tensor),dim=1).cuda()
           else: 
-              t_tensor=t/T*TIME*torch.ones(N).reshape(-1,1)
+              t_tensor=t/time_step*TIME*torch.ones(n_samples).reshape(-1,1)
               x_Utility=torch.cat((PHI_on_s[:,t].reshape(-1,1),XI_W_on_s[:,t].reshape(-1,1),t_tensor),dim=1)
           PHI_dot_on_s[:,t] = model_list_Utility[t](x_Utility).reshape(-1,)
-          PHI_on_s[:,(t+1)] = PHI_on_s[:,t].reshape(-1)+PHI_dot_on_s[:,(t)].reshape(-1)*TIME/T      
-        loss_Utility = Mean_Utility_on_s(XI_W_on_s,PHI_on_s,PHI_dot_on_s,S_OUTSTANDING,GAMMA,LAM,MU_BAR,ALPHA,TIME)
+          PHI_on_s[:,(t+1)] = PHI_on_s[:,t].reshape(-1)+PHI_dot_on_s[:,(t)].reshape(-1)*TIME/time_step      
+        loss_Utility = Mean_Utility_on_s(XI_W_on_s,PHI_on_s,PHI_dot_on_s,q,S_OUTSTANDING,GAMMA,LAM,MU_BAR,ALPHA,TIME)
         loss_arr_Utility.append(loss_Utility.data)
         loss_Utility.backward()   
         optimizer_Utility.step()     

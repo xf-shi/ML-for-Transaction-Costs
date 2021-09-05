@@ -2,7 +2,5 @@
 **/*.pt
 *.pkl
 **/*.pkl
-*.png
-**/*.png
 *.csv
 **/*.csv

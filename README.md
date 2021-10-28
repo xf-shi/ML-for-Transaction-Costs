@@ -1,4 +1,4 @@
-# Hedging with Transaction Costs: Machine Learning or not?
+# Deep Learning Algorithms for Hedging with Frictions
 
 This repository contains the Forward-Backward Stochastic Differential Equation (FBSDE) solver and the Deep Q-learning, as described in reference [1]. Both of them are implemented in PyTorch.
 

@@ -109,4 +109,4 @@ This project is licensed under the [NAME HERE] License - see the LICENSE.md file
 ## Acknowledgments
 
 ## Reference
-[1] J. Muhle-Karbe, X. Shi, D. Xu and Z. Zhang. Hedging with Transaction Costs: Machine Learning or not? *arXiv preprint* [[arXiv]](https://arxiv.org), 2021. 
+[1]  Deep Learning Algorithms for Hedging with Frictions, X. Shi, D. Xu and Z. Zhang. *arXiv preprint* [[arXiv]](https://arxiv.org), 2021. 

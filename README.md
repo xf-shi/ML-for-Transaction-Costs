@@ -1,6 +1,6 @@
 # Deep Learning Algorithms for Hedging with Frictions
 
-This repository contains the Forward-Backward Stochastic Differential Equation (FBSDE) solver and the Deep Q-learning, as described in reference [1]. Both of them are implemented in PyTorch.
+This repository contains the Forward-Backward Stochastic Differential Equation (FBSDE) solver and the Deep Q-learning, as described in reference [2]. Both of them are implemented in PyTorch.
 
 ## Basic Setup
 
@@ -54,7 +54,7 @@ The core dynamic is defined in the method `System.forward()`, and the key variab
 | `Z_t` | the **backward component**, <img src="https://latex.codecogs.com/gif.latex?Y_t " /> |
 
 
-## Deep Q-learning
+## Deep Hedging
 For the detailed implementation of the deep Q-learning, see [`Script/sample_code_Deep_Q.py`](./Script/sample_code_Deep_Q.py);   
 The core dynamic of the Deep Q-learning is defined in the function `TRAIN_Utility()`, and the key variables in the code are summarized below:
 | Variable | Meaning |
@@ -71,7 +71,7 @@ The core dynamic of the Deep Q-learning is defined in the function `TRAIN_Utilit
 ## Example
 Here we proivde an example for the quadratic cost case (`q=2`) with the trading horizon of 21 days (`TIME=21`).    
 <br/>
-The trading horizon is discretized in 168 time steps (`TIME_STEP=168`). And the parameters is outlined below:
+The trading horizon is discretized in 168 time steps (`TIME_STEP=168`). The parameters are taken from the calibration in [1]:
 
 | Parameter | Value | Code | 
 | --- | ---  | --- | 

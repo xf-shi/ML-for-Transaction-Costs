@@ -11,7 +11,7 @@ if not train_on_gpu:
 else:
     print('CUDA is available!  Training on GPU ...')
 import pandas as pd
-from sample_code_Deep_Q import *
+from sample_code_Deep_Hedging import *
 from sample_code_FBSDE import *
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -195,23 +195,22 @@ pathid=1
 fig = plt.figure(figsize=(10,4))
 time   = np.linspace(0, TIME_STEP*DT, TIME_STEP+1)
 time_FBSDE   = np.linspace(0, TIME_STEP*DT, TIME_STEP+1)
-plt.subplot(1,2,1)
-plt.plot(time_FBSDE[1:],PHI_dot_FBSDE[pathid,:], label = "FBSDE")
-plt.plot(time[1:],S_OUTSTANDING*PHI_dot_on_s_Utility[pathid,:].cpu().detach().numpy(), label = "Deep Q-learning")
-plt.plot(time[1:],PHI_dot_APP_Mathematica[pathid,:], label = "Leading-order")
-plt.hlines(0,xmin=0,xmax=TIME,linestyles='dotted')
-plt.title("{}".format("$\\dot{\\varphi_t}$"))
-plt.grid()
-plt.legend()
-
-plt.subplot(1,2,2)
-plt.plot(time_FBSDE,PHI_FBSDE[pathid,:], label = "FBSDE")
-plt.plot(time,S_OUTSTANDING*PHI_on_s_Utility[pathid,:].cpu().detach().numpy(), label = "Deep Q-learning")
-plt.plot(time,PHI_APP_Mathematica[pathid,:], label = "Leading-order")
-plt.title("{}".format("$\\varphi_t$"))
-plt.grid()
-plt.legend()
-fig.savefig(path+"trading{}_cost{}.png".format(TIME,q),bbox_inches='tight')
+ax1=plt.subplot(1,2,1)
+ax1.plot(time_FBSDE[1:],PHI_dot_FBSDE[pathid,:], label = "FBSDE")
+ax1.plot(time[1:],S_OUTSTANDING*PHI_dot_on_s_Utility[pathid,:].cpu().detach().numpy(), label = "Deep Hedging")
+ax1.plot(time[1:],PHI_dot_APP_Mathematica[pathid,:], label = "Leading-order")
+ax1.hlines(0,xmin=0,xmax=TIME,linestyles='dotted')
+ax1.title.set_text("{}".format("$\\dot{\\varphi_t}$"))
+ax1.grid()
+ax2=plt.subplot(1,2,2)
+ax2.plot(time_FBSDE,PHI_FBSDE[pathid,:], label = "FBSDE")
+ax2.plot(time,S_OUTSTANDING*PHI_on_s_Utility[pathid,:].cpu().detach().numpy(), label = "Deep Hedging")
+ax2.plot(time,PHI_APP_Mathematica[pathid,:], label = "Leading-order")
+ax2.title.set_text("{}".format("$\\varphi_t$"))
+ax2.grid()
+box2=ax2.get_position()
+ax2.legend(loc="lower left", bbox_to_anchor=(box2.width*3,box2.height))
+fig.savefig(path+"trading{}_cost{}.pdf".format(TIME,q),bbox_inches='tight')
 
 ### UTILITY
 FBSDEloss_trainbyUtility=criterion(PHI_dot_on_s_Utility.cpu()[:,-1],TARGET_test.reshape((-1,)))

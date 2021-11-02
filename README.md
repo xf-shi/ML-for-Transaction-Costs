@@ -1,6 +1,6 @@
 # Deep Learning Algorithms for Hedging with Frictions
 
-This repository contains the Forward-Backward Stochastic Differential Equation (FBSDE) solver and the Deep Q-learning, as described in reference [2]. Both of them are implemented in PyTorch.
+This repository contains the Forward-Backward Stochastic Differential Equation (FBSDE) solver and the Deep Hedging, as described in reference [2]. Both of them are implemented in PyTorch.
 
 ## Basic Setup
 
@@ -11,11 +11,11 @@ The special case with following assumptions is considered:
 * the endowment volatility is in the form of <img src="https://latex.codecogs.com/gif.latex?\xi_t=\hat{\xi}W_t" /> where <img src="https://latex.codecogs.com/gif.latex?\hat{\xi}" /> is constant; 
 * the frictionless strategy satisfies that   <img src="https://latex.codecogs.com/gif.latex?\bar{b_t}=0" /> and <img src="https://latex.codecogs.com/gif.latex?\bar{a_t}=-\hat{\xi}{\sigma}^{-1}" />
 
-On top of that, we consider two calibrated models: a quadratic transaction cost models, and a power cost model with elastic parameter of 3/2. In both experiments, the FBSDE solver and the Deep Q-learning are implemented, as well as the asymptotic formula from Theorem 3.6 in reference [1].     
+On top of that, we consider two calibrated models: a quadratic transaction cost models, and a power cost model with elastic parameter of 3/2. In both experiments, the FBSDE solver and the Deep Hedging are implemented, as well as the asymptotic formula from Theorem 3.6 in reference [2].     
 <br/>
-For the case of quadratic costs, the ground truth from equation (3.7) in reference [1] is also compared. See [`Script/sample_code_quadratic_cost.py`](./Script/sample_code_quadratic_cost.py) for details.   
+For the case of quadratic costs, the ground truth from equation (3.7) in reference [2] is also compared. See [`Script/sample_code_quadratic_cost.py`](./Script/sample_code_quadratic_cost.py) for details.   
 <br/>
-For the case of 3/2 power costs, the ground truth is no longer available in closed form. Meanwhile, in regard to the asymptotic formula g(x) in equation (3.8) in reference [1], the numerical solution by [SciPy](https://github.com/scipy/scipy) is not stable, thus it is solved via MATHEMATICA (see [`Script/3on2cost_ODE.nb`](./Script/3on2cost_ODE.nb)). Consequently, the value of g(x) corresponding to x ranging from 0 to 50 by 0.0001, is stored in table [`Data/EVA.txt`](./Data/EVA.txt). Benefitted from the oddness and the growth conditions (equation (3.9) in reference [1]), the value of g(x) on <img src="https://latex.codecogs.com/gif.latex?\mathbb{R}" /> is obatinable. Following that, the numerical result of the asymptotic solution is compared with two machine learning methods. See [`Script/sample_code_3_2_cost.py`](./Script/sample_code_3_2_cost.py) for details.
+For the case of 3/2 power costs, the ground truth is no longer available in closed form. Meanwhile, in regard to the asymptotic formula g(x) in equation (3.8) in reference [2], the numerical solution by [SciPy](https://github.com/scipy/scipy) is not stable, thus it is solved via MATHEMATICA (see [`Script/3on2cost_ODE.nb`](./Script/3on2cost_ODE.nb)). Consequently, the value of g(x) corresponding to x ranging from 0 to 50 by 0.0001, is stored in table [`Data/EVA.txt`](./Data/EVA.txt). Benefitted from the oddness and the growth conditions (equation (3.9) in reference [2]), the value of g(x) on <img src="https://latex.codecogs.com/gif.latex?\mathbb{R}" /> is obatinable. Following that, the numerical result of the asymptotic solution is compared with two machine learning methods. See [`Script/sample_code_3_2_cost.py`](./Script/sample_code_3_2_cost.py) for details.
 <br/><br/>
 The general variables and the market parameters in the code are summarized below:
 | Variable | Meaning |
@@ -55,8 +55,8 @@ The core dynamic is defined in the method `System.forward()`, and the key variab
 
 
 ## Deep Hedging
-For the detailed implementation of the deep Q-learning, see [`Script/sample_code_Deep_Q.py`](./Script/sample_code_Deep_Q.py);   
-The core dynamic of the Deep Q-learning is defined in the function `TRAIN_Utility()`, and the key variables in the code are summarized below:
+For the detailed implementation of the Deep Hedging, see [`Script/sample_code_Deep_Hedging.py`](./Script/sample_code_Deep_Hedging.py);   
+The core dynamic of the Deep Hedging is defined in the function `TRAIN_Utility()`, and the key variables in the code are summarized below:
 | Variable | Meaning |
 | --- | ---  |
 | `time_step`  |   time discretization, N |
@@ -82,9 +82,9 @@ The trading horizon is discretized in 168 time steps (`TIME_STEP=168`). The para
 | endowment volatility parameter | <img src="https://latex.codecogs.com/gif.latex?\hat{\xi}=2.19\times10^{10}" />| `XI_1=2.19*1e10` |
 | trading cost parameter |<img src="https://latex.codecogs.com/gif.latex?\lambda=1.08\times10^{-10}"/> | `LAM=1.08*1e-10`|
 
-And these lead to the optimal trading rate (left panel) and the optimal position (right panel) illustrated below, leanrt by the FBSDE solver and the Deep Q-learning, as well as the ground truth and the Leading-order solution based on the asymptotic formula:   
+And these lead to the optimal trading rate (left panel) and the optimal position (right panel) illustrated below, leanrt by the FBSDE solver and the Deep Hedging, as well as the ground truth and the Leading-order solution based on the asymptotic formula:   
 
-![TR=21_q=2](./Gallery/Single_TR=21_q=2_calibrated_parameter.png)
+![TR=21_q=2](./Gallery/single_quad_21.png)
 <br/>
 With the same simulation with test batch size of 3000 (`test_samples=3000`), the expectation and the standard deviation of the goal function <img src="https://latex.codecogs.com/gif.latex?J_T(\dot{\varphi})"/> and the mean square error of the terminal trading rate are calculated, as summarized below:
 

@@ -109,4 +109,5 @@ This project is licensed under the [NAME HERE] License - see the LICENSE.md file
 ## Acknowledgments
 
 ## Reference
-[1]  Deep Learning Algorithms for Hedging with Frictions, X. Shi, D. Xu and Z. Zhang. *arXiv preprint* [[arXiv]](https://arxiv.org), 2021. 
+[1]  Asset Pricing with General Transaction Costs: Theory and Numerics, L. Gonon, J. Muhle-Karbe, X. Shi. *Mathematical Finance* [[Full version]](https://onlinelibrary.wiley.com/doi/full/10.1111/mafi.12297), 2021.
+[2]  Deep Learning Algorithms for Hedging with Frictions, X. Shi, D. Xu, Z. Zhang. *arXiv preprint* [[arXiv]](https://arxiv.org), 2021. 

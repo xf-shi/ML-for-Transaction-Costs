@@ -1,6 +1,6 @@
-# Hedging with Transaction Costs: Machine Learning or not?
+# Deep Learning Algorithms for Hedging with Frictions
 
-This repository contains the Forward-Backward Stochastic Differential Equation (FBSDE) solver and the Deep Q-learning, as described in reference [1]. Both of them are implemented in PyTorch.
+This repository contains the Forward-Backward Stochastic Differential Equation (FBSDE) solver and the Deep Q-learning, as described in reference [2]. Both of them are implemented in PyTorch.
 
 ## Basic Setup
 
@@ -54,7 +54,7 @@ The core dynamic is defined in the method `System.forward()`, and the key variab
 | `Z_t` | the **backward component**, <img src="https://latex.codecogs.com/gif.latex?Y_t " /> |
 
 
-## Deep Q-learning
+## Deep Hedging
 For the detailed implementation of the deep Q-learning, see [`Script/sample_code_Deep_Q.py`](./Script/sample_code_Deep_Q.py);   
 The core dynamic of the Deep Q-learning is defined in the function `TRAIN_Utility()`, and the key variables in the code are summarized below:
 | Variable | Meaning |
@@ -71,7 +71,7 @@ The core dynamic of the Deep Q-learning is defined in the function `TRAIN_Utilit
 ## Example
 Here we proivde an example for the quadratic cost case (`q=2`) with the trading horizon of 21 days (`TIME=21`).    
 <br/>
-The trading horizon is discretized in 168 time steps (`TIME_STEP=168`). And the parameters is outlined below:
+The trading horizon is discretized in 168 time steps (`TIME_STEP=168`). The parameters are taken from the calibration in [1]:
 
 | Parameter | Value | Code | 
 | --- | ---  | --- | 
@@ -97,16 +97,18 @@ With the same simulation with test batch size of 3000 (`test_samples=3000`), the
 
 
 
-See more examples and discussion in Section 4.3 of paper [1].   
+See more examples and discussion in Section 4 of paper [2].   
 
-
+<!-- 
 ## Authors
 
 ## License
 
 This project is licensed under the [NAME HERE] License - see the LICENSE.md file for details
-
+ -->
 ## Acknowledgments
 
 ## Reference
-[1] J. Muhle-Karbe, X. Shi, D. Xu and Z. Zhang. Hedging with Transaction Costs: Machine Learning or not? *arXiv preprint* [[arXiv]](https://arxiv.org), 2021. 
+[1]  Asset Pricing with General Transaction Costs: Theory and Numerics, L. Gonon, J. Muhle-Karbe, X. Shi. [[Mathematical Finance]](https://onlinelibrary.wiley.com/doi/full/10.1111/mafi.12297), 2021.
+
+[2]  Deep Learning Algorithms for Hedging with Frictions, X. Shi, D. Xu, Z. Zhang. [[arXiv]](https://arxiv.org), 2021. 

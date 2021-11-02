@@ -97,7 +97,7 @@ With the same simulation with test batch size of 3000 (`test_samples=3000`), the
 
 
 
-See more examples and discussion in Section 4.3 of paper [1].   
+See more examples and discussion in Section 4 of paper [2].   
 
 <!-- 
 ## Authors

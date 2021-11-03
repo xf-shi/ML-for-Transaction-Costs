@@ -52,7 +52,7 @@ The core dynamic is defined in the method `System.forward()`, and the key variab
 |   `sigmaZ_t` | output of the neural network <img src="https://latex.codecogs.com/gif.latex?F^{\theta} " />,  <img src="https://latex.codecogs.com/gif.latex?Z_{t} " /> |
 | `Delta_t` | difference between the frictional and frictionless positions (the **forward component**) divided by the endowment parameter, <img src="https://latex.codecogs.com/gif.latex? {\Delta%20\varphi_t} / {\xi}" /> 
 <img src="https://latex.codecogs.com/gif.latex? {\Delta}{\varphi_t}/{\xi}" />
-<img src="https://latex.codecogs.com/gif.latex? {\varphi_t}" /> |
+<img src="https://latex.codecogs.com/gif.latex? {\Delta}/{\xi}" /> |
 | `Z_t` | the **backward component**, <img src="https://latex.codecogs.com/gif.latex?Y_t " /> |
 
 

@@ -50,9 +50,7 @@ The core dynamic is defined in the method `System.forward()`, and the key variab
 | `Lam_t` | 1 |
 |  `in_t` | input of the neural network <img src="https://latex.codecogs.com/gif.latex?F^{\theta} " /> |
 |   `sigmaZ_t` | output of the neural network <img src="https://latex.codecogs.com/gif.latex?F^{\theta} " />,  <img src="https://latex.codecogs.com/gif.latex?Z_{t} " /> |
-| `Delta_t` | difference between the frictional and frictionless positions (the **forward component**) divided by the endowment parameter, <img src="https://latex.codecogs.com/gif.latex? \Delta%20\varphi_t/\xi" /> 
-<img src="https://latex.codecogs.com/gif.latex?{\Delta}{\varphi_t}/{\xi}" />
-<img src="https://latex.codecogs.com/gif.latex?\xi" /> |
+| `Delta_t` | difference between the frictional and frictionless positions (the **forward component**) divided by the endowment parameter, <img src="https://latex.codecogs.com/gif.latex?\Delta%20\varphi_t/\xi" /> |
 | `Z_t` | the **backward component**, <img src="https://latex.codecogs.com/gif.latex?Y_t " /> |
 
 
@@ -65,9 +63,9 @@ The core dynamic of the Deep Hedging is defined in the function `TRAIN_Utility()
 | `n_samples` | number of sample path, batch_size |
 | `PHI_0_on_s` | initial holding divided by the total shares in the market, <img src="https://latex.codecogs.com/gif.latex?\varphi_{0-}/s" /> |
 | `W` | collection of the Brownian motion, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{W_t\}" /> |
-| `XI_W_on_s` | collection of the endowment volatility divided by the total shares in the market, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\xi_t /s\}" /> |
-| `PHI_on_s` | collection of the frictional positions divided by the total shares in the market, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\varphi_t /s\}" /> |
-| `PHI_dot_on_s` | collection of the frictional trading rate divided by the total shares in the market, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\dot{\varphi_t} /s\}" /> |
+| `XI_W_on_s` | collection of the endowment volatility divided by the total shares in the market, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\xi_t/s\}" /> |
+| `PHI_on_s` | collection of the frictional positions divided by the total shares in the market, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\varphi_t/s\}" /> |
+| `PHI_dot_on_s` | collection of the frictional trading rate divided by the total shares in the market, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\dot{\varphi_t}/s\}" /> |
 | `loss_Utility` | minus goal function, <img src="https://latex.codecogs.com/gif.latex?-J_T(\dot{\varphi})" /> |
 
 ## Example

@@ -8,14 +8,14 @@ The special case with following assumptions is considered:
 
 * the dynamic of the market satisfies that return <img src="https://latex.codecogs.com/gif.latex?\mu" /> and voalatility <img src="https://latex.codecogs.com/gif.latex?\sigma" /> are constant;
 * the cost parameter <img src="https://latex.codecogs.com/gif.latex?\lambda" /> is constant;
-* the endowment volatility is in the form of <img src="https://latex.codecogs.com/gif.latex?\xi_t=\hat{\xi}W_t" /> where <img src="https://latex.codecogs.com/gif.latex?\hat{\xi}" /> is constant; 
-* the frictionless strategy satisfies that   <img src="https://latex.codecogs.com/gif.latex?\bar{b_t}=0" /> and <img src="https://latex.codecogs.com/gif.latex?\bar{a_t}=-\hat{\xi}{\sigma}^{-1}" />
+* the endowment volatility is in the form of <img src="https://latex.codecogs.com/gif.latex?\xi_t={\xi}W_t" /> where <img src="https://latex.codecogs.com/gif.latex?{\xi}" /> is constant; 
+* the frictionless strategy satisfies that   <img src="https://latex.codecogs.com/gif.latex?\bar{b}_t=0" /> and <img src="https://latex.codecogs.com/gif.latex?\bar{a}_t=-{\xi}/{\sigma}" />
 
 On top of that, we consider two calibrated models: a quadratic transaction cost models, and a power cost model with elastic parameter of 3/2. In both experiments, the FBSDE solver and the Deep Hedging are implemented, as well as the asymptotic formula from Theorem 3.6 in reference [2].     
 <br/>
 For the case of quadratic costs, the ground truth from equation (3.7) in reference [2] is also compared. See [`Script/sample_code_quadratic_cost.py`](./Script/sample_code_quadratic_cost.py) for details.   
 <br/>
-For the case of 3/2 power costs, the ground truth is no longer available in closed form. Meanwhile, in regard to the asymptotic formula g(x) in equation (3.8) in reference [2], the numerical solution by [SciPy](https://github.com/scipy/scipy) is not stable, thus it is solved via MATHEMATICA (see [`Script/3on2cost_ODE.nb`](./Script/3on2cost_ODE.nb)). Consequently, the value of g(x) corresponding to x ranging from 0 to 50 by 0.0001, is stored in table [`Data/EVA.txt`](./Data/EVA.txt). Benefitted from the oddness and the growth conditions (equation (3.9) in reference [2]), the value of g(x) on <img src="https://latex.codecogs.com/gif.latex?\mathbb{R}" /> is obatinable. Following that, the numerical result of the asymptotic solution is compared with two machine learning methods. See [`Script/sample_code_3_2_cost.py`](./Script/sample_code_3_2_cost.py) for details.
+For the case of 3/2 power costs, the ground truth is no longer available in closed form. Meanwhile, in regard to the asymptotic formula g(x) in equation (3.8) in reference [2], the numerical solution by [SciPy](https://github.com/scipy/scipy) is not stable, thus it is solved via MATHEMATICA (see [`Script/power_cost_ODE.nb`](./Script/power_cost_ODE.nb)). Consequently, the value of g(x) corresponding to x ranging from 0 to 50 by 0.0001, is stored in table [`Data/EVA.txt`](./Data/EVA.txt). Benefitted from the oddness and the growth conditions (equation (3.9) in reference [2]), the value of g(x) on <img src="https://latex.codecogs.com/gif.latex?\mathbb{R}" /> is obatinable. Following that, the numerical result of the asymptotic solution is compared with two machine learning methods. See [`Script/sample_code_power_cost.py`](./Script/sample_code_power_cost.py) for details.
 <br/><br/>
 The general variables and the market parameters in the code are summarized below:
 | Variable | Meaning |
@@ -24,9 +24,9 @@ The general variables and the market parameters in the code are summarized below
 | `S_OUTSTANDING` | total shares in the market, s |
 | `TIME` | trading horizon, T |
 | `TIME_STEP` |   time discretization, N |
-| `DT ` | <img src="https://latex.codecogs.com/gif.latex?\Delta%20t=\frac{T}{N}" />  |
+| `DT ` | <img src="https://latex.codecogs.com/gif.latex?\Delta%20t={T}/{N}" />  |
 | `GAMMA` | risk aversion, <img src="https://latex.codecogs.com/gif.latex?\gamma" /> |
-| `XI_1` | endowment volatility parameter, <img src="https://latex.codecogs.com/gif.latex?\hat{\xi}" /> |
+| `XI_1` | endowment volatility parameter, <img src="https://latex.codecogs.com/gif.latex?{\xi}" /> |
 | `PHI_INITIAL` | initial holding,  <img src="https://latex.codecogs.com/gif.latex?\varphi_{0-}" /> |
 | `ALPHA` | market volatility,  <img src="https://latex.codecogs.com/gif.latex?\sigma " /> |
 | `MU_BAR` | market return,  <img src="https://latex.codecogs.com/gif.latex?\mu " /> |
@@ -50,7 +50,7 @@ The core dynamic is defined in the method `System.forward()`, and the key variab
 | `Lam_t` | 1 |
 |  `in_t` | input of the neural network <img src="https://latex.codecogs.com/gif.latex?F^{\theta} " /> |
 |   `sigmaZ_t` | output of the neural network <img src="https://latex.codecogs.com/gif.latex?F^{\theta} " />,  <img src="https://latex.codecogs.com/gif.latex?Z_{t} " /> |
-| `Delta_t` | difference between the frictional and frictionless positions (the **forward component**) divided by the endowment parameter, <img src="https://latex.codecogs.com/gif.latex?{\hat{\xi}}^{-1}\Delta%20\varphi_t " /> |
+| `Delta_t` | difference between the frictional and frictionless positions (the **forward component**) divided by the endowment parameter, <img src="https://latex.codecogs.com/gif.latex? \Delta%20\varphi_t /{\xi}" /> |
 | `Z_t` | the **backward component**, <img src="https://latex.codecogs.com/gif.latex?Y_t " /> |
 
 
@@ -61,11 +61,11 @@ The core dynamic of the Deep Hedging is defined in the function `TRAIN_Utility()
 | --- | ---  |
 | `time_step`  |   time discretization, N |
 | `n_samples` | number of sample path, batch_size |
-| `PHI_0_on_s` | initial holding divided by the total shares in the market, <img src="https://latex.codecogs.com/gif.latex?s^{-1}\times\varphi_{0-}" /> |
+| `PHI_0_on_s` | initial holding divided by the total shares in the market, <img src="https://latex.codecogs.com/gif.latex?\varphi_{0-}/s" /> |
 | `W` | collection of the Brownian motion, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{W_t\}" /> |
-| `XI_W_on_s` | collection of the endowment volatility divided by the total shares in the market, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{s^{-1}\times\xi_t\}" /> |
-| `PHI_on_s` | collection of the frictional positions divided by the total shares in the market, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{s^{-1}\times\varphi_t\}" /> |
-| `PHI_dot_on_s` | collection of the frictional trading rate divided by the total shares in the market, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{s^{-1}\times\dot{\varphi_t}\}" /> |
+| `XI_W_on_s` | collection of the endowment volatility divided by the total shares in the market, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\xi_t /s\}" /> |
+| `PHI_on_s` | collection of the frictional positions divided by the total shares in the market, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\varphi_t /s\}" /> |
+| `PHI_dot_on_s` | collection of the frictional trading rate divided by the total shares in the market, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\dot{\varphi_t} /s\}" /> |
 | `loss_Utility` | minus goal function, <img src="https://latex.codecogs.com/gif.latex?-J_T(\dot{\varphi})" /> |
 
 ## Example
@@ -79,7 +79,7 @@ The trading horizon is discretized in 168 time steps (`TIME_STEP=168`). The para
 |total shares outstanding |<img src="https://latex.codecogs.com/gif.latex?s=2.46\times10^{11}"/> | `S_OUTSTANDING=2.46*1e11` |
 |stock volatility  |<img src="https://latex.codecogs.com/gif.latex?\sigma=1.88"/>  | `ALPHA=1.88`|
 | stock return|<img src="https://latex.codecogs.com/gif.latex?\mu=0.5\times\gamma\times\sigma^2"/> |`MU_BAR=0.5*GAMMA*ALPHA**2` |
-| endowment volatility parameter | <img src="https://latex.codecogs.com/gif.latex?\hat{\xi}=2.19\times10^{10}" />| `XI_1=2.19*1e10` |
+| endowment volatility parameter | <img src="https://latex.codecogs.com/gif.latex?{\xi}=2.19\times10^{10}" />| `XI_1=2.19*1e10` |
 | trading cost parameter |<img src="https://latex.codecogs.com/gif.latex?\lambda=1.08\times10^{-10}"/> | `LAM=1.08*1e-10`|
 
 And these lead to the optimal trading rate (left panel) and the optimal position (right panel) illustrated below, leanrt by the FBSDE solver and the Deep Hedging, as well as the ground truth and the Leading-order solution based on the asymptotic formula:   

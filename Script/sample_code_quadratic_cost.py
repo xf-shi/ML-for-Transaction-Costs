@@ -96,7 +96,6 @@ loss_arr_Q=result_Q['loss']
 
 
 def TEST(dW,model_list_Utility,test_samples):
-
     with torch.no_grad():
         T=len(model_list_Utility)
         for model in model_list_Utility:
@@ -131,7 +130,6 @@ def TEST(dW,model_list_Utility,test_samples):
                 x_Utility=torch.cat((PHI_on_s[:,t].reshape(-1,1),XI_W_on_s[:,t].reshape(-1,1),t_tensor),dim=1)        
             PHI_dot_on_s[:,t] = model_list_Utility[t](x_Utility).reshape(-1,)
             PHI_on_s[:,(t+1)] = PHI_on_s[:,t].reshape(-1)+PHI_dot_on_s[:,(t)].reshape(-1)*TIME/T
-
         for model in model_list_Utility:
             model.train() 
         ###Ground Truth
@@ -176,10 +174,8 @@ def TEST(dW,model_list_Utility,test_samples):
         }
     return(result)
 
-
 def big_test(test_samples,REPEAT,model_list_Utility=model_list_Q):
     TARGET_test = torch.zeros(test_samples).reshape((test_samples, 1))
-
     mu_Utility = 0.0
     mu2_Utility = 0.0
     FBSDELOSS_Utility = 0.0
@@ -206,18 +202,15 @@ def big_test(test_samples,REPEAT,model_list_Utility=model_list_Q):
         PHI_dot_on_s_Utility=Test_result["PHI_dot_on_s_Utility"]
         PHI_dot_APP_on_s=Test_result["PHI_dot_APP_on_s"]
         PHI_dot_TRUTH_on_s=Test_result["PHI_dot_on_s_TRUTH"]
-        
         PHI_on_s_Utility=Test_result["PHI_on_s_Utility"]
         PHI_APP_on_s=Test_result["PHI_APP_on_s"]
         PHI_TRUTH_on_s=Test_result["PHI_on_s_TRUTH"]
-
         #FBSDE
         test.system.sample_phi(dW_test_FBSDE)
         PHI_dot_FBSDE=(test.system.D_Delta_t_value*XI-XI/ALPHA*dW_test_FBSDE[:,0,:].cpu().numpy())/DT
         PHI_dot_FBSDE_on_s=PHI_dot_FBSDE/S_OUTSTANDING
         PHI_FBSDE=test.system.Delta_t_value*XI+MU_BAR/GAMMA/ALPHA/ALPHA-(S_OUTSTANDING*XI_test_on_s_FBSDE/ALPHA).cpu().numpy()
         PHI_FBSDE_on_s=PHI_FBSDE/S_OUTSTANDING
-
         ### UTILITY
         FBSDEloss_trainbyUtility=criterion(PHI_dot_on_s_Utility.cpu()[:,-1],TARGET_test.reshape((-1,)))
         Utilityloss_trainbyUtility_on_s = Mean_Utility_on_s(XI_test_on_s.cpu(),PHI_on_s_Utility.cpu(),PHI_dot_on_s_Utility.cpu(),q,S_OUTSTANDING,GAMMA,LAM,MU_BAR,ALPHA,TIME)
@@ -225,7 +218,6 @@ def big_test(test_samples,REPEAT,model_list_Utility=model_list_Q):
         FBSDELOSS_Utility=FBSDELOSS_Utility +FBSDEloss_trainbyUtility
         mu_Utility =mu_Utility + Utilityloss_trainbyUtility_on_s
         mu2_Utility =mu2_Utility+ UtilitylossSQ_trainbyUtility_on_s 
-
         ### FBSDE
         FBSDEloss_trainbyFBSDE=criterion(torch.from_numpy(PHI_dot_FBSDE_on_s)[:,-1],TARGET_test.reshape((-1,)))
         Utilityloss_trainbyFBSDE_on_s = Mean_Utility_on_s(XI_test_on_s.cpu(),torch.from_numpy(PHI_FBSDE_on_s),torch.from_numpy(PHI_dot_FBSDE_on_s),q,S_OUTSTANDING,GAMMA,LAM,MU_BAR,ALPHA,TIME)
@@ -233,7 +225,6 @@ def big_test(test_samples,REPEAT,model_list_Utility=model_list_Q):
         FBSDELOSS_FBSDE=FBSDELOSS_FBSDE +FBSDEloss_trainbyFBSDE
         mu_FBSDE =mu_FBSDE+ Utilityloss_trainbyFBSDE_on_s
         mu2_FBSDE =mu2_FBSDE+ UtilitylossSQ_trainbyFBSDE_on_s 
-
         ### LO
         FBSDELoss_APP=criterion(torch.from_numpy(PHI_dot_APP_on_s)[:,-1], TARGET_test.reshape((-1,)))
         Utilityloss_LO_on_s = Mean_Utility_on_s(XI_test_on_s.cpu(),torch.from_numpy(PHI_APP_on_s),torch.from_numpy(PHI_dot_APP_on_s),q,S_OUTSTANDING,GAMMA,LAM,MU_BAR,ALPHA,TIME)
@@ -241,7 +232,6 @@ def big_test(test_samples,REPEAT,model_list_Utility=model_list_Q):
         FBSDELOSS_LO=FBSDELOSS_LO +FBSDELoss_APP
         mu_LO =mu_LO+ Utilityloss_LO_on_s
         mu2_LO =mu2_LO+ UtilitylossSQ_LO_on_s 
-
         ### TRUTH
         FBSDELoss_byTRUTH=criterion(torch.from_numpy(PHI_dot_TRUTH_on_s)[:,-1], TARGET_test.reshape((-1,)))
         Utilityloss_TRUTH_on_s = Mean_Utility_on_s(XI_test_on_s.cpu(),torch.from_numpy(PHI_TRUTH_on_s),torch.from_numpy(PHI_dot_TRUTH_on_s),q,S_OUTSTANDING,GAMMA,LAM,MU_BAR,ALPHA,TIME)
@@ -249,7 +239,6 @@ def big_test(test_samples,REPEAT,model_list_Utility=model_list_Q):
         FBSDELOSS_TRUTH=FBSDELOSS_TRUTH +FBSDELoss_byTRUTH
         mu_TRUTH =mu_TRUTH+ Utilityloss_TRUTH_on_s
         mu2_TRUTH =mu2_TRUTH+ UtilitylossSQ_TRUTH_on_s 
-        
         if itr==0:
             ###plot
             pathid=1#000
@@ -274,7 +263,6 @@ def big_test(test_samples,REPEAT,model_list_Utility=model_list_Q):
             box2=ax2.get_position()
             ax2.legend(loc="lower left", bbox_to_anchor=(box2.width*3,box2.height))
             plt.savefig(path+"q{} trading{}.pdf".format(q,TIME), bbox_inches='tight')
-
     big_result={"mu_Utility":mu_Utility ,
       "mu2_Utility":mu2_Utility ,
       "FBSDELOSS_Utility":FBSDELOSS_Utility, 
@@ -288,27 +276,20 @@ def big_test(test_samples,REPEAT,model_list_Utility=model_list_Q):
       "mu2_TRUTH":mu2_TRUTH, 
       "FBSDELOSS_TRUTH":FBSDELOSS_TRUTH
       }
-
     return big_result
 
 test_size=3 #10000 later
-REPEAT = 1 #10000
-
-print("TIME={} q={} test_size={} REPEAT={}".format(TIME,q,test_size,REPEAT))
-
+REPEAT = 2 #10000
 torch.manual_seed(1)
-
 n_cpu=1 #15
 batch_size = int(math.ceil(REPEAT / n_cpu))
 big_result_arr = Parallel(n_jobs=n_cpu)(delayed(big_test)(
             test_size, min(REPEAT, batch_size * (i + 1)) - batch_size * i, model_list_Q
         ) for i in range(n_cpu))
-
 big_result = big_result_arr[0]
 for i in range(1, len(big_result_arr)):
     for key in big_result:
         big_result[key] += big_result_arr[i][key]
-
 mu_Utility=big_result["mu_Utility"]
 mu2_Utility =big_result["mu2_Utility"]
 FBSDELOSS_Utility=big_result["FBSDELOSS_Utility"] 
@@ -334,8 +315,6 @@ mu_FBSDE =mu_FBSDE/ REPEAT
 mu2_FBSDE =mu2_FBSDE / REPEAT
 sigma_FBSDE = (mu2_FBSDE-mu_FBSDE**2)*(REPEAT*test_size)/(REPEAT*test_size-1)
 sigma_FBSDE = sigma_FBSDE **0.5
-
-
 
 FBSDELOSS_LO=FBSDELOSS_LO/ REPEAT
 mu_LO =mu_LO/ REPEAT

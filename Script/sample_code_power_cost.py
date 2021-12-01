@@ -110,17 +110,11 @@ def new_g_q_Mathematica(x):
     return g_value
 new_g_q_Mathematica_vec=np.vectorize(new_g_q_Mathematica)
 
-
 def TEST(dW,model_list_Utility,test_samples):
     with torch.no_grad():
-
-            #torch.manual_seed(TEST_SEED)
             T=len(model_list_Utility)
-            ###  the Utility-based
             for model in model_list_Utility:
                 model.eval()
-
-
             PHI_0_on_s = torch.ones(test_samples)*PHI_INITIAL/S_OUTSTANDING
             PHI_0 = torch.ones(test_samples)*PHI_INITIAL
             DUMMY_1 = torch.ones(test_samples).reshape((test_samples, 1))
@@ -142,8 +136,6 @@ def TEST(dW,model_list_Utility,test_samples):
             PHI_dot_on_s = torch.zeros((test_samples, T ))
             if train_on_gpu:
                 PHI_dot_on_s = PHI_dot_on_s.to(device="cuda")
-
-
             for t in range(T):
                 ### UTILITY
                 if train_on_gpu:
@@ -154,32 +146,22 @@ def TEST(dW,model_list_Utility,test_samples):
                     x_Utility=torch.cat((PHI_on_s[:,t].reshape(-1,1),XI_W_on_s[:,t].reshape(-1,1),t_tensor),dim=1)        
                 PHI_dot_on_s[:,t] = model_list_Utility[t](x_Utility).reshape(-1,)
                 PHI_on_s[:,(t+1)] = PHI_on_s[:,t].reshape(-1)+PHI_dot_on_s[:,(t)].reshape(-1)*TIME/T
-
             for model in model_list_Utility:
-                model.train()   
-
+                model.train()  
             # Leading Order by Mathematica
             PHI_dot_APP_Mathematica = np.zeros((test_samples,T))
-            PHI_APP_Mathematica = np.zeros((test_samples,T+1))
-            """if train_on_gpu:
-                PHI_dot_APP_Mathematica = PHI_dot_APP_Mathematica.to(device="cuda")
-                PHI_APP_Mathematica = PHI_APP_Mathematica.to(device="cuda")"""
+            PHI_APP_Mathematica = np.zeros((test_samples,T+1))            
             PHI_APP_Mathematica[:,0] = PHI_APP_Mathematica[:,0]+PHI_0.cpu().numpy().reshape((-1,))
             for t in range(T):
-
                 XIt=XI_W_on_s.cpu().numpy()[:,t] *S_OUTSTANDING
                 PHIt=PHI_APP_Mathematica[:,t]
                 PHIBARt=MU_BAR/GAMMA/ALPHA/ALPHA-XIt/ALPHA
                 xxx=2**((q-1)/(q+2))*(q*GAMMA*ALPHA*ALPHA/LAM)**(1/(q+2))*(ALPHA/XI)**(2*q/(q+2))*(PHIt-PHIBARt)
-                #xxx=xxx.detach().cpu().numpy()
                 PHI_dot_APP_Mathematica[:,t]=(-np.sign(PHIt-PHIBARt)
                           *(q*GAMMA*XI**4/8/LAM/ALPHA/ALPHA)**(1/(q+2))
                           *abs(new_g_q_Mathematica_vec(xxx)/q)**(1/(q-1))
                           )
-
                 PHI_APP_Mathematica[:,t+1]=PHI_APP_Mathematica[:,t]+PHI_dot_APP_Mathematica[:,t]*TIME/T
-    
-
     result={
         "T":T,
         "Sample_XI_on_s":XI_W_on_s,
@@ -192,12 +174,8 @@ def TEST(dW,model_list_Utility,test_samples):
         }
     return(result)
 
-
-
 def big_test(test_samples,REPEAT,model_list_Utility=model_list_Q):
-
     TARGET_test = torch.zeros(test_samples).reshape((test_samples, 1))
-
     mu_Utility = 0.0
     mu2_Utility = 0.0
     FBSDELOSS_Utility = 0.0
@@ -207,7 +185,6 @@ def big_test(test_samples,REPEAT,model_list_Utility=model_list_Q):
     mu_LO = 0.0
     mu2_LO = 0.0
     FBSDELOSS_LO = 0.0
-
     for itr in tqdm(range(REPEAT)):
         dW_test = train_data(n_samples=test_samples,bm_dim= BM_DIM,time_step= TIME_STEP,dt = DT)
         dW_test_FBSDE=dW_test
@@ -223,15 +200,11 @@ def big_test(test_samples,REPEAT,model_list_Utility=model_list_Q):
         PHI_dot_APP_on_s=Test_result["PHI_dot_on_s_APP_Mathematica"]
         PHI_on_s_Utility=Test_result["PHI_on_s_Utility"]
         PHI_APP_on_s=Test_result["PHI_on_s_APP_Mathematica"]
-        
         test.system.sample_phi(dW_test_FBSDE)
         PHI_dot_FBSDE=(test.system.D_Delta_t_value*XI-XI/ALPHA*dW_test_FBSDE[:,0,:].cpu().numpy())/DT
         PHI_dot_FBSDE_on_s=PHI_dot_FBSDE/S_OUTSTANDING
         PHI_FBSDE=test.system.Delta_t_value*XI+MU_BAR/GAMMA/ALPHA/ALPHA-(S_OUTSTANDING*XI_test_on_s_FBSDE/ALPHA).cpu().numpy()
-        PHI_FBSDE_on_s=PHI_FBSDE/S_OUTSTANDING
-
-        
-
+        PHI_FBSDE_on_s=PHI_FBSDE/S_OUTSTANDING    
         ### UTILITY
         FBSDEloss_trainbyUtility=criterion(PHI_dot_on_s_Utility.cpu()[:,-1],TARGET_test.reshape((-1,)))
         Utilityloss_trainbyUtility_on_s = Mean_Utility_on_s(XI_test_on_s.cpu(),PHI_on_s_Utility.cpu(),PHI_dot_on_s_Utility.cpu(),q,S_OUTSTANDING,GAMMA,LAM,MU_BAR,ALPHA,TIME)
@@ -239,7 +212,6 @@ def big_test(test_samples,REPEAT,model_list_Utility=model_list_Q):
         FBSDELOSS_Utility=FBSDELOSS_Utility +FBSDEloss_trainbyUtility
         mu_Utility =mu_Utility + Utilityloss_trainbyUtility_on_s
         mu2_Utility =mu2_Utility+ UtilitylossSQ_trainbyUtility_on_s 
-
         ### FBSDE
         FBSDEloss_trainbyFBSDE=criterion(torch.from_numpy(PHI_dot_FBSDE_on_s)[:,-1],TARGET_test.reshape((-1,)))
         Utilityloss_trainbyFBSDE_on_s = Mean_Utility_on_s(XI_test_on_s.cpu(),torch.from_numpy(PHI_FBSDE_on_s),torch.from_numpy(PHI_dot_FBSDE_on_s),q,S_OUTSTANDING,GAMMA,LAM,MU_BAR,ALPHA,TIME)
@@ -247,16 +219,13 @@ def big_test(test_samples,REPEAT,model_list_Utility=model_list_Q):
         FBSDELOSS_FBSDE=FBSDELOSS_FBSDE +FBSDEloss_trainbyFBSDE
         mu_FBSDE =mu_FBSDE+ Utilityloss_trainbyFBSDE_on_s
         mu2_FBSDE =mu2_FBSDE+ UtilitylossSQ_trainbyFBSDE_on_s 
-
-
         ### LO
         FBSDELoss_APP=criterion(torch.from_numpy(PHI_dot_APP_on_s)[:,-1], TARGET_test.reshape((-1,)))
         Utilityloss_LO_on_s = Mean_Utility_on_s(XI_test_on_s.cpu(),torch.from_numpy(PHI_APP_on_s),torch.from_numpy(PHI_dot_APP_on_s),q,S_OUTSTANDING,GAMMA,LAM,MU_BAR,ALPHA,TIME)
         UtilitylossSQ_LO_on_s = MeanSQ_Utility_on_s(XI_test_on_s.cpu(),torch.from_numpy(PHI_APP_on_s),torch.from_numpy(PHI_dot_APP_on_s),q,S_OUTSTANDING,GAMMA,LAM,MU_BAR,ALPHA,TIME)
         FBSDELOSS_LO=FBSDELOSS_LO +FBSDELoss_APP
         mu_LO =mu_LO+ Utilityloss_LO_on_s
-        mu2_LO =mu2_LO+ UtilitylossSQ_LO_on_s 
-        
+        mu2_LO =mu2_LO+ UtilitylossSQ_LO_on_s        
         if itr==0:
             ###plot
             pathid=1#000
@@ -279,7 +248,6 @@ def big_test(test_samples,REPEAT,model_list_Utility=model_list_Q):
             box2=ax2.get_position()
             ax2.legend(loc="lower left", bbox_to_anchor=(box2.width*3,box2.height))
             plt.savefig(path+"q{} trading{}.pdf".format(q,TIME), bbox_inches='tight')
-
     big_result={"mu_Utility":mu_Utility ,
     "mu2_Utility":mu2_Utility ,
     "FBSDELOSS_Utility":FBSDELOSS_Utility, 
@@ -289,7 +257,6 @@ def big_test(test_samples,REPEAT,model_list_Utility=model_list_Q):
     "mu_LO":mu_LO,
     "mu2_LO":mu2_LO, 
     "FBSDELOSS_LO":FBSDELOSS_LO}
-
     return big_result
 
 test_size=3#10000 later
@@ -317,7 +284,6 @@ mu_LO=    big_result["mu_LO"]
 mu2_LO=    big_result["mu2_LO"] 
 FBSDELOSS_LO=    big_result["FBSDELOSS_LO"]
 
-
 FBSDELOSS_Utility=FBSDELOSS_Utility/ REPEAT
 mu_Utility = mu_Utility/REPEAT
 mu2_Utility = mu2_Utility/REPEAT
@@ -330,15 +296,11 @@ mu2_FBSDE =mu2_FBSDE / REPEAT
 sigma_FBSDE = (mu2_FBSDE-mu_FBSDE**2)*(REPEAT*test_size)/(REPEAT*test_size-1)
 sigma_FBSDE = sigma_FBSDE **0.5
 
-
-
-
 FBSDELOSS_LO=FBSDELOSS_LO/ REPEAT
 mu_LO =mu_LO/ REPEAT
 mu2_LO =mu2_LO/ REPEAT
 sigma_LO = (mu2_LO-mu_LO**2)*(REPEAT*test_size)/(REPEAT*test_size-1)
 sigma_LO=sigma_LO**0.5
-
 #
 mu_Utility = mu_Utility*S_OUTSTANDING
 sigma_Utility=sigma_Utility*S_OUTSTANDING
@@ -351,6 +313,5 @@ df=pd.DataFrame(columns=["Method",'E(Utility)',"sd(Utility)","MSE at T (on S)"])
 df=df.append({"Method":"Utility Based","E(Utility)":"{:e}".format(-mu_Utility.data.cpu().numpy()/TIME),"sd(Utility)":"{:e}".format(sigma_Utility.data.cpu().numpy()/TIME),"MSE at T (on S)":FBSDELOSS_Utility.data.cpu().numpy()},ignore_index=True)
 df=df.append({"Method":"FBSDE","E(Utility)":"{:e}".format(-mu_FBSDE.data.cpu().numpy()/TIME),"sd(Utility)":"{:e}".format(sigma_FBSDE.data.cpu().numpy()/TIME),"MSE at T (on S)":FBSDELOSS_FBSDE.data.cpu().numpy()},ignore_index=True)
 df=df.append({"Method":"Leading Order","E(Utility)":"{:e}".format(-mu_LO.data.cpu().numpy()/TIME),"sd(Utility)":"{:e}".format(sigma_LO.data.cpu().numpy()/TIME),"MSE at T (on S)":FBSDELOSS_LO.data.cpu().numpy()},ignore_index=True)
-
 
 df.to_csv(path+"trading{}_cost{}.csv".format(TIME,q), index=False, header=True)

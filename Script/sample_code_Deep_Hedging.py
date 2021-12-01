@@ -17,6 +17,19 @@ def Mean_Utility_on_s(XI_W_on_s,PHI_on_s,PHI_dot_on_s,q,S_OUTSTANDING,GAMMA,LAM,
     loss = loss*TIME/totalT
     return torch.mean(loss)
 
+def MeanSQ_Utility_on_s(XI_W_on_s,PHI_on_s,PHI_dot_on_s,q,S_OUTSTANDING,GAMMA,LAM,MU_BAR,ALPHA,TIME):
+    """Minus Utility
+    XI_on_s: (N,1,T)
+    PHI_on_s: (N,T+1)
+    PHI_dot_on_s: (N,T) """  
+    C_1=S_OUTSTANDING*GAMMA/2
+    C_2=(S_OUTSTANDING)**(q-1)*LAM/q
+    totalT = XI_W_on_s.shape[-1]-1
+    totalN = XI_W_on_s.shape[0]
+    loss = -torch.sum(MU_BAR*PHI_on_s[:,:-1],1) + C_1*torch.sum((ALPHA*PHI_on_s[:,:-1]+XI_W_on_s[:,:-1])**2,1) + C_2*torch.sum((torch.abs(PHI_dot_on_s))**(2),1)
+    loss = loss*TIME/totalT
+    return torch.mean(loss**2)
+
 def SD_Utility_on_s(XI_W_on_s,PHI_on_s,PHI_dot_on_s,q,S_OUTSTANDING,GAMMA,LAM,MU_BAR,ALPHA,TIME):
     """Calculate the standard deviation of the Minus Utility
     XI_on_s: (SAMPLE_SIZE,1,TIME_STEP) 

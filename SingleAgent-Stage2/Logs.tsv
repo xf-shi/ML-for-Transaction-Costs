@@ -1,0 +1,3 @@
+None	2022-03-28-23-10-18	{"algo": "deep_hedging", "cost": "quadratic", "model_name": "discretized_feedforward", "solver": "Adam", "hidden_lst": [50, 50, 50], "lr": 0.01, "epoch": 10, "decay": 0.1, "scheduler_step": 10000, "retrain": true}
+None	2022-03-28-23-11-13	{"algo": "deep_hedging", "cost": "quadratic", "model_name": "discretized_feedforward", "solver": "Adam", "hidden_lst": [50, 50, 50], "lr": 0.01, "epoch": 10, "decay": 0.1, "scheduler_step": 10000, "retrain": true}
+None	2022-03-28-23-12-06	{"algo": "deep_hedging", "cost": "quadratic", "model_name": "discretized_feedforward", "solver": "Adam", "hidden_lst": [50, 50, 50], "lr": 0.01, "epoch": 10, "decay": 0.1, "scheduler_step": 10000, "retrain": true}

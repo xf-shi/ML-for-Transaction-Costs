@@ -1,0 +1,15 @@
+Compare:
+    Discretized Neural Network v.s. RNN v.s. Deep Q
+
+Coding Flexibility:
+    Vectorize all constants
+    High-dimensional stock (m stocks)
+        Parameters:
+            \phi_t: vector of M
+            \phi_dot_t: vector of M
+            \mu_t: vector of M
+            \sigma_t: matrix of M x d
+            W_t: vector of d
+            \xi: matrix of d x d
+            \lambda: symmetric matrix M x M
+            \gamma: scalar

@@ -34,11 +34,13 @@ N_BM = BM_COV.shape[0]
 def get_constants(dW_std):
     W_std = torch.cumsum(torch.cat((torch.zeros((N_SAMPLE, 1, N_BM)), dW_std), dim=1), dim=1)
     mu_tm = torch.ones((T, N_STOCK))
-    sigma_tm = torch.ones((T, N_STOCK))
+    sigma_tmd = torch.ones((T, N_STOCK, N_BM))
     s_tm = torch.ones((T, N_STOCK))
     xi_dd = torch.ones((N_BM, N_BM))
     lam_mm = torch.ones((N_STOCK, N_STOCK))
-    return W_std.to(device = DEVICE), mu_tm.to(device = DEVICE), sigma_tm.to(device = DEVICE), s_tm.to(device = DEVICE), xi_dd.to(device = DEVICE), lam_mm.to(device = DEVICE)
+    alpha_md = torch.ones((N_STOCK, N_BM))
+    beta_m = torch.ones(N_STOCK)
+    return W_std.to(device = DEVICE), mu_tm.to(device = DEVICE), sigma_tmd.to(device = DEVICE), s_tm.to(device = DEVICE), xi_dd.to(device = DEVICE), lam_mm.to(device = DEVICE), alpha_md.to(device = DEVICE), beta_m.to(device = DEVICE)
 
 ## Check if CUDA is avaialble
 train_on_gpu = torch.cuda.is_available()
@@ -54,7 +56,7 @@ torch.manual_seed(0)
 
 MULTI_NORMAL = MultivariateNormal(torch.zeros((N_SAMPLE, T, N_BM)), BM_COV)
 dW_STD = MULTI_NORMAL.sample().to(device = DEVICE)
-W_STD, MU_TM, SIGMA_TM, S_TM, XI_DD, LAM_MM = get_constants(dW_STD)
+W_STD, MU_TM, SIGMA_TMD, S_TM, XI_DD, LAM_MM, ALPHA_MD, BETA_M = get_constants(dW_STD)
 
 ## Feedforward neural network
 class Net(nn.Module):
@@ -166,10 +168,10 @@ class DynamicsFactory():
     def __init__(self, ts_lst, dW_std):
         assert ts_lst[0] == 0
         self.dW_std = dW_std
-        self.W_std, self.mu_tm, self.sigma_tm, self.s_tm, self.xi_dd, self.lam_mm = get_constants(dW_std)
+        self.W_std, self.mu_tm, self.sigma_tmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m = get_constants(dW_std)
     
     def get_constant_processes(self):
-        return self.W_std, self.mu_tm, self.sigma_tm, self.s_tm, self.xi_dd, self.lam_mm
+        return self.W_std, self.mu_tm, self.sigma_tmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m
     
     ## TODO: Implement it -- Zhanhao Zhang
     def fbsde_quad(self, model):
@@ -185,7 +187,10 @@ class DynamicsFactory():
     
     ## TODO: Implement it -- Daran Xu
     def leading_order_power(self, model = None):
-        pass
+        phi_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device = DEVICE)
+        phi_stm[:,0,:] = S_OUTSTANDING / 2
+        phi_dot_stm = torch.zeros((N_SAMPLE, T, N_STOCK)).to(device = DEVICE)
+        coef = GAMMA * self.alpha_md ** 2 * torch.inv(self.lam_mm)
     
     ## TODO: Implement it -- Zhanhao Zhang
     def ground_truth(self, model = None):
@@ -209,11 +214,11 @@ class LossFactory():
     def __init__(self, ts_lst, dW_std):
         assert ts_lst[0] == 0
         self.dW_std = dW_std
-        self.W_std, self.mu_tm, self.sigma_tm, self.s_tm, self.xi_dd, self.lam_mm = get_constants(dW_std)
+        self.W_std, self.mu_tm, self.sigma_tmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m = get_constants(dW_std)
     
     ## TODO: Implement it -- Zhanhao Zhang
     def utility_loss(self, phi_dot_stm, phi_stm, power):
-        loss_mat = torch.einsum("ijk, lk -> ij", phi_stm[:,1:,:], self.mu_tm) - GAMMA / 2 * (torch.einsum("ijk, lk -> ij", phi_stm[:,1:,:], self.sigma_tm) + torch.einsum("ijk, lk -> ij", self.W_std[:,1:,:], self.xi_dd)) ** 2 - 1 / 2 * torch.einsum("ijk, lk, ijl -> ij", phi_dot_stm, self.lam_mm, phi_dot_stm)
+        loss_mat = torch.einsum("ijk, jk -> ij", phi_stm[:,1:,:], self.mu_tm) - GAMMA / 2 * (torch.einsum("ijk, jkl -> ij", phi_stm[:,1:,:], self.sigma_tmd) + torch.einsum("ijk, lk -> ij", self.W_std[:,1:,:], self.xi_dd)) ** 2 - 1 / 2 * torch.einsum("ijk, lk, ijl -> ij", phi_dot_stm, self.lam_mm, phi_dot_stm)
         loss_compact = -torch.sum(loss_mat * TR / T) / N_SAMPLE
         return loss_compact
     
@@ -278,7 +283,11 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         power = 3 / 2
     
     ## TODO: Change the input dimension accordingly
-    model_factory = ModelFactory(model_name, N_BM + 1, hidden_lst, N_STOCK, lr, decay, scheduler_step, solver, retrain)
+    if algo == "deep_hedging":
+        output_dim = N_STOCK
+    else:
+        output_dim = N_BM * N_STOCK
+    model_factory = ModelFactory(model_name, N_BM + 1, hidden_lst, output_dim, lr, decay, scheduler_step, solver, retrain)
     model, optimizer, scheduler, prev_ts = model_factory.prepare_model()
     
     loss_arr = []
@@ -324,7 +333,7 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
     else:
         power = 3 / 2
     dynamic_factory = DynamicsFactory(TIMESTAMPS, dW_std)
-    W_std, mu_tm, sigma_tm, s_tm, xi_dd, lam_mm = dynamic_factory.get_constant_processes()
+    W_std, mu_tm, sigma_tm, s_tm, xi_dd, lam_mm, alpha_md, beta_m = dynamic_factory.get_constant_processes()
     if algo == "deep_hedging":
         phi_dot_stm, phi_stm = dynamic_factory.deep_hedging(model)
     elif algo == "fbsde":

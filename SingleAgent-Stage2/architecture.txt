@@ -13,3 +13,5 @@ Coding Flexibility:
             \xi: matrix of d x d
             \lambda: symmetric matrix M x M
             \gamma: scalar
+            \alpha: matrix of M x d
+            \beta: vector of d

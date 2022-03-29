@@ -112,8 +112,10 @@ class ModelFactory:
         if self.model is None:
             if model_name == "discretized_feedforward":
                 self.model = self.discretized_feedforward()
+                self.model = ModelFull(self.model, is_discretized = True)
             else:
                 self.model = self.rnn()
+                self.model = ModelFull(self.model, is_discretized = False)
             self.model = self.model.to(device = DEVICE)
 
     ## TODO: Implement it -- Zhanhao Zhang
@@ -197,7 +199,7 @@ class DynamicsFactory():
         curr_t = torch.ones((N_SAMPLE, 1))
         for t in range(T):
             x = torch.cat((self.W_std[:,t,:], curr_t), dim = 1).to(device = DEVICE)
-            phi_dot_stm[:,t,:] = model[t](x)
+            phi_dot_stm[:,t,:] = model((t, x))
             phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] * TR / T
         return phi_dot_stm, phi_stm
 

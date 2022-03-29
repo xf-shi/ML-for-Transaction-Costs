@@ -173,24 +173,24 @@ class DynamicsFactory():
     def get_constant_processes(self):
         return self.W_std, self.mu_tm, self.sigma_tmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m
     
-    ## TODO: Implement it -- Zhanhao Zhang
+    ## TODO: Implement it -- Daran Xu
     def fbsde_quad(self, model):
         pass
     
-    ## TODO: Implement it -- Daran Xu
+    ## TODO: Implement it -- TBD
     def fbsde_power(self, model):
         pass
     
     ## TODO: Implement it -- Zhanhao Zhang
     def leading_order_quad(self, model = None):
-        pass
-    
-    ## TODO: Implement it -- Daran Xu
-    def leading_order_power(self, model = None):
         phi_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device = DEVICE)
         phi_stm[:,0,:] = S_OUTSTANDING / 2
         phi_dot_stm = torch.zeros((N_SAMPLE, T, N_STOCK)).to(device = DEVICE)
         coef = GAMMA * self.alpha_md ** 2 * torch.inv(self.lam_mm)
+    
+    ## TODO: Implement it -- TBD
+    def leading_order_power(self, model = None):
+        pass
     
     ## TODO: Implement it -- Zhanhao Zhang
     def ground_truth(self, model = None):

@@ -287,7 +287,8 @@ class LossFactory():
         assert ts_lst[0] == 0
         self.dW_std = dW_std
         self.W_std, self.mu_tm, self.sigma_tmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m = get_constants(dW_std)
-    
+        self.mse_loss_func=torch.nn.MSELoss()
+
     ## TODO: Implement it -- Zhanhao Zhang
     def utility_loss(self, phi_dot_stm, phi_stm, power):
         loss_mat = torch.einsum("ijk, jk -> ij", phi_stm[:,1:,:], self.mu_tm) - GAMMA / 2 * (torch.einsum("ijk, jkl -> ij", phi_stm[:,1:,:], self.sigma_tmd) + torch.einsum("ijk, kl -> ij", self.W_std[:,1:,:], self.xi_dd)) ** 2 - 1 / 2 * torch.einsum("ijk, lk, ijl -> ij", phi_dot_stm, self.lam_mm, phi_dot_stm)
@@ -296,7 +297,10 @@ class LossFactory():
     
     ## TODO: Implement it -- Zhanhao Zhang
     def fbsde_loss(self, phi_dot_stm, phi_stm):
-        pass
+        Value=phi_dot_stm[:,-1,:]
+        Target=torch.zeros_like(Value,device=DEVICE)
+        return self.mse_loss_func(Value,Target)
+
 
 ## Write training logs to file
 def write_logs(ts_lst, train_args):

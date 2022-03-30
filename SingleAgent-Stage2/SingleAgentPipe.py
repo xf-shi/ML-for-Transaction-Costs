@@ -37,7 +37,7 @@ def get_constants(dW_std):
     sigma_tmd = torch.ones((T, N_STOCK, N_BM))
     s_tm = torch.ones((T, N_STOCK))
     xi_dd = torch.ones((N_BM, N_BM))
-    lam_mm = torch.ones((N_STOCK, N_STOCK))
+    lam_mm = torch.eye(N_STOCK) #torch.ones((N_STOCK, N_STOCK))
     alpha_md = torch.ones((N_STOCK, N_BM))
     beta_m = torch.ones(N_STOCK)
     return W_std.to(device = DEVICE), mu_tm.to(device = DEVICE), sigma_tmd.to(device = DEVICE), s_tm.to(device = DEVICE), xi_dd.to(device = DEVICE), lam_mm.to(device = DEVICE), alpha_md.to(device = DEVICE), beta_m.to(device = DEVICE)
@@ -169,9 +169,24 @@ class DynamicsFactory():
         assert ts_lst[0] == 0
         self.dW_std = dW_std
         self.W_std, self.mu_tm, self.sigma_tmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m = get_constants(dW_std)
+        self.lam_mm_half = self.mat_frac_pow(self.lam_mm, 1/2)
+        self.lam_mm_negHalf = self.mat_frac_pow(self.lam_mm, -1/2)
+        self.alpha_mm_sq = self.alpha_md @ self.alpha_md.T
+        self.const_mm = self.lam_mm_negHalf @ self.mat_frac_pow(self.lam_mm_negHalf @ self.alpha_mm_sq @ self.lam_mm_negHalf, 1/2) @ self.lam_mm_half
+        self.sigma_tmm_sq = torch.einsum("ijk, ilj -> ikl", self.sigma_tmd, self.sigma_tmd)
+        self.sigma_tmm_sq_inv = torch.zeros((T, N_STOCK, N_STOCK))
+        for t in range(T):
+            self.sigma_tmm_sq_inv[t,:,:] = torch.inverse(self.sigma_tmm_sq[t,:,:])
+        self.xi_std_w = torch.einsum("ijk, kl -> ijl", self.W_std, self.xi_dd)
+        self.phi_stm_bar = 1 / GAMMA * torch.einsum("ijk, ik -> ij", self.sigma_tmm_sq_inv, self.mu_tm) - torch.einsum("jlk, ijk -> ijl", torch.einsum("ijk, ikl -> ijl", self.sigma_tmm_sq_inv, self.sigma_tmd), self.xi_std_w)
     
     def get_constant_processes(self):
         return self.W_std, self.mu_tm, self.sigma_tmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m
+    
+    def mat_frac_pow(self, mat, power):
+        evals, evecs = torch.eig(mat, eigenvectors = True)
+        mat_ret = torch.matmul(evecs, torch.diag(evals ** power), torch.inverse(evecs))
+        return mat_ret
     
     ## TODO: Implement it -- Daran Xu
     def fbsde_quad(self, model):
@@ -186,7 +201,10 @@ class DynamicsFactory():
         phi_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device = DEVICE)
         phi_stm[:,0,:] = S_OUTSTANDING / 2
         phi_dot_stm = torch.zeros((N_SAMPLE, T, N_STOCK)).to(device = DEVICE)
-        coef = GAMMA * self.alpha_md ** 2 * torch.inv(self.lam_mm)
+        for t in range(T):
+            phi_dot_stm[:,t,:] = -(phi_stm[:,t,:] - self.phi_stm_bar[:,t,:]) @ self.const_mm
+            phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] * TR / T
+        return phi_dot_stm, phi_stm
     
     ## TODO: Implement it -- TBD
     def leading_order_power(self, model = None):
@@ -218,7 +236,7 @@ class LossFactory():
     
     ## TODO: Implement it -- Zhanhao Zhang
     def utility_loss(self, phi_dot_stm, phi_stm, power):
-        loss_mat = torch.einsum("ijk, jk -> ij", phi_stm[:,1:,:], self.mu_tm) - GAMMA / 2 * (torch.einsum("ijk, jkl -> ij", phi_stm[:,1:,:], self.sigma_tmd) + torch.einsum("ijk, lk -> ij", self.W_std[:,1:,:], self.xi_dd)) ** 2 - 1 / 2 * torch.einsum("ijk, lk, ijl -> ij", phi_dot_stm, self.lam_mm, phi_dot_stm)
+        loss_mat = torch.einsum("ijk, jk -> ij", phi_stm[:,1:,:], self.mu_tm) - GAMMA / 2 * (torch.einsum("ijk, jkl -> ij", phi_stm[:,1:,:], self.sigma_tmd) + torch.einsum("ijk, kl -> ij", self.W_std[:,1:,:], self.xi_dd)) ** 2 - 1 / 2 * torch.einsum("ijk, lk, ijl -> ij", phi_dot_stm, self.lam_mm, phi_dot_stm)
         loss_compact = -torch.sum(loss_mat * TR / T) / N_SAMPLE
         return loss_compact
     

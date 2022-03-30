@@ -30,36 +30,49 @@ BM_COV = torch.tensor(BM_COV)
 assert len(BM_COV.shape) == 2 and BM_COV.shape[0] == BM_COV.shape[1] and BM_COV.shape[0]
 N_BM = BM_COV.shape[0]
 
-###
-mu_tm = torch.tensor([[2.99, 3.71, 3.55]]).repeat(T,1)
-sigma_tmd = torch.ones((T, N_STOCK, N_BM)) #???
-#torch.tensor([[72.00, 71.49, 54.80],[71.49, 85.42, 65.86],[54.80, 65.86, 56.84]]) #???
-print(sigma_tmd)
-print(sigma_tmd.shape)
-s_tm = torch.ones((T, N_STOCK))
-xi_dd = torch.tensor([[ -2.07, 1.91, 0.64],[1.91, -1.77, -0.59],[0.64 ,-0.59 ,-0.20]]) *1e9
-lam_mm = torch.diag(torch.tensor([0.1269, 0.3354, 0.8595])) * 1e-8 #torch.ones((N_STOCK, N_STOCK))
-alpha_md = torch.ones((N_STOCK, N_BM)) #???
-beta_m = torch.ones(N_STOCK) #???
-###
-#sys.exit()
-
 ## TODO: Adjust this function to get constant processes
 ## Compute constants processes using dW
 def get_constants(dW_std):
     W_std = torch.cumsum(torch.cat((torch.zeros((N_SAMPLE, 1, N_BM)), dW_std), dim=1), dim=1)
+    
+    mu_tm = torch.tensor([[2.99, 3.71, 3.55]]).repeat(T,1)
+    sigma_tmd = torch.ones((T, N_STOCK, N_BM)) #???
+    #torch.tensor([[72.00, 71.49, 54.80],[71.49, 85.42, 65.86],[54.80, 65.86, 56.84]]) #???
+    s_tm = torch.ones((T, N_STOCK))
+    xi_dd = torch.tensor([[ -2.07, 1.91, 0.64],[1.91, -1.77, -0.59],[0.64 ,-0.59 ,-0.20]]) *1e9
+    lam_mm = torch.diag(torch.tensor([0.1269, 0.3354, 0.8595])) * 1e-8 #torch.ones((N_STOCK, N_STOCK))
+    alpha_md = torch.ones((N_STOCK, N_BM)) #???
+    beta_m = torch.ones(N_STOCK) #???
 
     ###
-    mu_tm = torch.ones((T, N_STOCK))
-    sigma_tmd = torch.ones((T, N_STOCK, N_BM))
-    s_tm = torch.ones((T, N_STOCK))
-    xi_dd = torch.ones((N_BM, N_BM))
-    lam_mm = torch.eye(N_STOCK) #torch.ones((N_STOCK, N_STOCK))
-    alpha_md = torch.ones((N_STOCK, N_BM))
-    beta_m = torch.ones(N_STOCK)
+#    mu_tm = torch.ones((T, N_STOCK))
+#    sigma_tmd = torch.ones((T, N_STOCK, N_BM))
+#    s_tm = torch.ones((T, N_STOCK))
+#    xi_dd = torch.ones((N_BM, N_BM))
+#    lam_mm = torch.eye(N_STOCK) #torch.ones((N_STOCK, N_STOCK))
+#    alpha_md = torch.ones((N_STOCK, N_BM))
+#    beta_m = torch.ones(N_STOCK)
     ###
 
     return W_std.to(device = DEVICE), mu_tm.to(device = DEVICE), sigma_tmd.to(device = DEVICE), s_tm.to(device = DEVICE), xi_dd.to(device = DEVICE), lam_mm.to(device = DEVICE), alpha_md.to(device = DEVICE), beta_m.to(device = DEVICE)
+
+## Solve for sigma assuming square matrix
+def solve_sigma_md_theoretical(sigma_mm_cov):
+    evals, evecs = torch.eig(sigma_mm_cov, eigenvectors = True)
+    return torch.matmul(evecs, torch.matmul(torch.diag(evals[:,0] ** 0.5), torch.inverse(evecs)))
+
+## Solve for sigma using numerical methods
+def solve_sigma_md(sigma_mm_cov, epoch = 1000, lr = 1e-2):
+    sigma_md = torch.normal(0, 1, size = (N_STOCK, N_BM))
+    sigma_md.requires_grad = True
+    for _ in tqdm(range(epoch)):
+        target = sigma_md @ sigma_md.T
+        loss = torch.sum((sigma_mm_cov - target) ** 2)
+        loss.backward()
+        sigma_md.data = sigma_md.data - lr * sigma_md.grad
+        sigma_md.grad.detach_()
+        sigma_md.grad.zero_()
+    return torch.abs(sigma_md.data)
 
 ## Check if CUDA is avaialble
 train_on_gpu = torch.cuda.is_available()

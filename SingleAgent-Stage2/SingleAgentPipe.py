@@ -212,7 +212,13 @@ class DynamicsFactory():
     
     ## TODO: Implement it -- Zhanhao Zhang
     def ground_truth(self, model = None):
-        pass
+        phi_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device = DEVICE)
+        phi_stm[:,0,:] = S_OUTSTANDING / 2
+        phi_dot_stm = torch.zeros((N_SAMPLE, T, N_STOCK)).to(device = DEVICE)
+        for t in range(T):
+            phi_dot_stm[:,t,:] = -(phi_stm[:,t,:] - self.phi_stm_bar[:,t,:]) @ self.const_mm @ torch.tanh(self.const_mm * (T - t))
+            phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] * TR / T
+        return phi_dot_stm, phi_stm
     
     ## TODO: Implement it -- Zhanhao Zhang
     def deep_hedging(self, model):

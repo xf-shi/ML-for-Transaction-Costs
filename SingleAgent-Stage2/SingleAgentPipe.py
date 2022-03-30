@@ -204,19 +204,7 @@ class DynamicsFactory():
             phi_stm[:, t + 1, :] = phi_stm[:, t, :] + phi_dot_stm[:, t, :] * TR / T
             x = torch.cat((self.W_std[:, t, :], t / T * TR * curr_t), dim=1).to(device=DEVICE)
             Z_stmd[:, t, :, :] = model((t, x)).reshape(N_SAMPLE, N_STOCK, N_BM)
-            phi_dot_stm[:, t + 1, :] = phi_dot_stm[:, t, :] + \
-                                       +TR / T * GAMMA * torch.einsum("ij,bj -> bi",
-                                                                      torch.mm(torch.mm(torch.inverse(self.lam_mm),
-                                                                                        self.sigma_tmd[t, :, :]),
-                                                                               self.sigma_tmd[t, :, :].T),
-                                                                      phi_stm[:, t, :]) + \
-                                       - TR / T * torch.matmul(torch.inverse(self.lam_mm), self.mu_tm[t, :]) + \
-                                       +TR / T * GAMMA * torch.einsum("md,sd -> sm",
-                                                                      torch.mm(torch.mm(torch.inverse(self.lam_mm),
-                                                                                        self.sigma_tmd[t, :, :]),
-                                                                               self.xi_dd),
-                                                                      self.W_std[:, t, :]) + \
-                                       +torch.einsum('bik, bk -> bi', Z_stmd[:, t, :, :], self.dW_std[:, t, :])
+            phi_dot_stm[:, t + 1, :] = phi_dot_stm[:, t, :] + TR / T * GAMMA * torch.einsum("ij,bj -> bi", torch.mm(torch.mm(torch.inverse(self.lam_mm), self.sigma_tmd[t, :, :]), self.sigma_tmd[t, :, :].T), phi_stm[:, t, :]) - TR / T * torch.matmul(torch.inverse(self.lam_mm), self.mu_tm[t, :]) + TR / T * GAMMA * torch.einsum("md,sd -> sm", torch.mm(torch.mm(torch.inverse(self.lam_mm), self.sigma_tmd[t, :, :]), self.xi_dd), self.W_std[:, t, :]) +torch.einsum('bik, bk -> bi', Z_stmd[:, t, :, :], self.dW_std[:, t, :])
             """
             # ??? N
             phi_dot_stm[:, t + 1, :] = phi_dot_stm[:, t, :] + \

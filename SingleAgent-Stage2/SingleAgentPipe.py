@@ -58,6 +58,16 @@ MULTI_NORMAL = MultivariateNormal(torch.zeros((N_SAMPLE, T, N_BM)), BM_COV)
 dW_STD = MULTI_NORMAL.sample().to(device = DEVICE)
 W_STD, MU_TM, SIGMA_TMD, S_TM, XI_DD, LAM_MM, ALPHA_MD, BETA_M = get_constants(dW_STD)
 
+## Neural network learning a single value
+class S_0(nn.Module):
+    def __init__(self, output_dim = 1):
+        super(S_0, self).__init__()
+        self.s_0 = nn.Linear(1, output_dim)
+#        torch.nn.init.constant_(self.s_0.weight, S_INITIAL)
+  
+    def forward(self, x):
+        return self.s_0(x)
+        
 ## Feedforward neural network
 class Net(nn.Module):
     def __init__(self, INPUT_DIM, HIDDEN_DIM_LST, OUTPUT_DIM=1):
@@ -95,9 +105,10 @@ class ModelFull(nn.Module):
 
 ## Construct arbitrary neural network models with optimizer and scheduler
 class ModelFactory:
-    def __init__(self, model_name, input_dim, hidden_lst, output_dim, lr, decay, scheduler_step, solver = "Adam", retrain = False):
+    def __init__(self, algo, model_name, input_dim, hidden_lst, output_dim, lr, decay, scheduler_step, solver = "Adam", retrain = False):
         assert solver in ["Adam", "SGD", "RMSprop"]
         assert model_name in ["discretized_feedforward", "rnn"]
+        assert algo in ["deep_hedging", "fbsde"]
         self.lr = lr
         self.decay = decay
         self.scheduler_step = scheduler_step
@@ -108,16 +119,26 @@ class ModelFactory:
         self.output_dim = output_dim
         self.model = None
         self.prev_ts = None
+        self.algo = algo
         
         if not retrain:
             self.model, self.prev_ts = self.load_latest()
         if self.model is None:
             if model_name == "discretized_feedforward":
                 self.model = self.discretized_feedforward()
+                if algo == "fbsde":
+                    self.model.append(S_0())
                 self.model = ModelFull(self.model, is_discretized = True)
             else:
                 self.model = self.rnn()
-                self.model = ModelFull(self.model, is_discretized = False)
+                if algo == "fbsde":
+                    model_lst = nn.ModuleList()
+                    model_lst.append(self.model)
+                    model_lst.append(S_0(self.output_dim))
+                    self.model = model_lst
+                    self.model = ModelFull(self.model, is_discretized = True)
+                else:
+                    self.model = ModelFull(self.model, is_discretized = False)
             self.model = self.model.to(device = DEVICE)
 
     ## TODO: Implement it -- Zhanhao Zhang
@@ -149,7 +170,7 @@ class ModelFactory:
         if curr_ts is None:
             curr_ts = datetime.now(tz=pytz.timezone("America/New_York")).strftime("%Y-%m-%d-%H-%M-%S")
         model_save = self.model.cpu()
-        torch.save(model_save, f"Models/{self.model_name}__{curr_ts}.pt")
+        torch.save(model_save, f"Models/{self.algo}_{self.model_name}__{curr_ts}.pt")
         return curr_ts
     
     def load_latest(self):
@@ -158,7 +179,7 @@ class ModelFactory:
         if len(ts_lst) == 0:
             return None, None
         ts = ts_lst[0]
-        model = torch.load(f"Models/{self.model_name}__{ts}.pt")
+        model = torch.load(f"Models/{self.algo}_{self.model_name}__{ts}.pt")
         model = model.to(device = DEVICE)
         return model, ts
 
@@ -176,7 +197,7 @@ class DynamicsFactory():
         self.sigma_tmm_sq = torch.einsum("ijk, ilk -> ijl", self.sigma_tmd, self.sigma_tmd)
         self.sigma_tmm_sq_inv = torch.zeros((T, N_STOCK, N_STOCK))
         for t in range(T):
-            self.sigma_tmm_sq_inv[t,:,:] = torch.inverse(self.sigma_tmm_sq[t,:,:])
+            self.sigma_tmm_sq_inv[t,:,:] = torch.inverse(self.sigma_tmm_sq[t,:,:]) #self.sigma_tmm_sq_inv[t,:,:] #
         self.xi_std_w = torch.einsum("ijk, kl -> ijl", self.W_std[:,1:,:], self.xi_dd)
         self.phi_stm_bar = 1 / GAMMA * torch.einsum("ijk, ik -> ij", self.sigma_tmm_sq_inv, self.mu_tm) - torch.einsum("jlk, ijk -> ijl", torch.einsum("ijk, ikl -> ijl", self.sigma_tmm_sq_inv, self.sigma_tmd), self.xi_std_w)
     
@@ -199,7 +220,7 @@ class DynamicsFactory():
         curr_t = torch.ones((N_SAMPLE, 1))
         x = torch.cat((self.W_std[:, 0, :], curr_t), dim=1).to(device=DEVICE)
         ###todo: parametrize the intitial value
-        # phi_dot_stm[:, 0, :] = model((0, x)) #[?]  # output is m-dim
+        phi_dot_stm[:, 0, :] = model((-1, x)) #[?]  # output is m-dim
         for t in range(T):
             phi_stm[:, t + 1, :] = phi_stm[:, t, :] + phi_dot_stm[:, t, :] * TR / T
             x = torch.cat((self.W_std[:, t, :], t / T * TR * curr_t), dim=1).to(device=DEVICE)
@@ -338,7 +359,7 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         output_dim = N_STOCK
     else:
         output_dim = N_BM * N_STOCK
-    model_factory = ModelFactory(model_name, N_BM + 1, hidden_lst, output_dim, lr, decay, scheduler_step, solver, retrain)
+    model_factory = ModelFactory(algo, model_name, N_BM + 1, hidden_lst, output_dim, lr, decay, scheduler_step, solver, retrain)
     model, optimizer, scheduler, prev_ts = model_factory.prepare_model()
     
     loss_arr = []
@@ -412,13 +433,13 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
         
 ## TODO: Adjust the arguments for training
 train_args = {
-    "algo": "fbsde",
+    "algo": "deep_hedging",
     "cost": "quadratic",
     "model_name": "discretized_feedforward",
     "solver": "Adam",
     "hidden_lst": [50, 50, 50],
     "lr": 1e-2,
-    "epoch": 2,
+    "epoch": 10,
     "decay": 0.1,
     "scheduler_step": 10000,
     "retrain": True,

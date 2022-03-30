@@ -190,7 +190,46 @@ class DynamicsFactory():
     
     ## TODO: Implement it -- Daran Xu
     def fbsde_quad(self, model):
-        pass
+        # need (1 + T) models in total
+        # model output should be
+        Z_stmd = torch.zeros((N_SAMPLE, T, N_STOCK, N_BM)).to(device=DEVICE)
+        phi_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device=DEVICE)
+        phi_stm[:, 0, :] = S_OUTSTANDING / 2
+        phi_dot_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device=DEVICE)  # note here phi_dot has T+1 timesteps
+        curr_t = torch.ones((N_SAMPLE, 1))
+        x = torch.cat((self.W_std[:, 0, :], curr_t), dim=1).to(device=DEVICE)
+        ###todo: parametrize the intitial value
+        # phi_dot_stm[:, 0, :] = model((0, x)) #[?]  # output is m-dim
+        for t in range(T):
+            phi_stm[:, t + 1, :] = phi_stm[:, t, :] + phi_dot_stm[:, t, :] * TR / T
+            x = torch.cat((self.W_std[:, t, :], t / T * TR * curr_t), dim=1).to(device=DEVICE)
+            Z_stmd[:, t, :, :] = model((t, x)).reshape(N_SAMPLE, N_STOCK, N_BM)
+            phi_dot_stm[:, t + 1, :] = phi_dot_stm[:, t, :] + \
+                                       +TR / T * GAMMA * torch.einsum("ij,bj -> bi",
+                                                                      torch.mm(torch.mm(torch.inverse(self.lam_mm),
+                                                                                        self.sigma_tmd[t, :, :]),
+                                                                               self.sigma_tmd[t, :, :].T),
+                                                                      phi_stm[:, t, :]) + \
+                                       - TR / T * torch.matmul(torch.inverse(self.lam_mm), self.mu_tm[t, :]) + \
+                                       +TR / T * GAMMA * torch.einsum("md,sd -> sm",
+                                                                      torch.mm(torch.mm(torch.inverse(self.lam_mm),
+                                                                                        self.sigma_tmd[t, :, :]),
+                                                                               self.xi_dd),
+                                                                      self.W_std[:, t, :]) + \
+                                       +torch.einsum('bik, bk -> bi', Z_stmd[:, t, :, :], self.dW_std[:, t, :])
+            """
+            # ??? N
+            phi_dot_stm[:, t + 1, :] = phi_dot_stm[:, t, :] + \
+                +TR / T * GAMMA * torch.einsum( "ij,bj -> bi" , torch.mm( torch.mm(torch.inverse(self.lam_mm), self.sigma_tmd[t, :, :]), self.sigma_tmd[t, :, :].T)  ,  phi_stm[:, t, :]) + \
+                +TR / T * GAMMA * torch.mm(torch.mm(torch.inverse(self.lam_mm), self.sigma_tmd[t, :, :]), self.xi_dd)[:,0]+ \
+                -TR / T * torch.mm(torch.mm(torch.mm(torch.inverse(self.lam_mm), self.sigma_tmd[t, :, :]), self.sigma_tmd[t, :, :].T),S_OUTSTANDING_M1 )[:,0] + \
+                +torch.einsum( 'bik, bk -> bi' , Z_stmd[:, t, :, :],self.dW_std[:,t,:])
+            # ??? N
+
+            stock_stm[:, t+1 , :] = stock_stm[:, t , :] +\
+                +TR / T * GAMMA * torch.mm(torch.mm( self.sigma_tmd[t, :, :], self.sigma_tmd[t, :, :].T),S_OUTSTANDING_M1 )[:,0] +\
+                + torch.einsum( 'ij, bj -> bi' , self.sigma_tmd[t, :, :],self.dW_std[:,t,:])"""
+        return phi_dot_stm, phi_stm
     
     ## TODO: Implement it -- TBD
     def fbsde_power(self, model):
@@ -385,13 +424,13 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
         
 ## TODO: Adjust the arguments for training
 train_args = {
-    "algo": "deep_hedging",
+    "algo": "fbsde",
     "cost": "quadratic",
     "model_name": "discretized_feedforward",
     "solver": "Adam",
     "hidden_lst": [50, 50, 50],
     "lr": 1e-2,
-    "epoch": 10,
+    "epoch": 2,
     "decay": 0.1,
     "scheduler_step": 10000,
     "retrain": True,

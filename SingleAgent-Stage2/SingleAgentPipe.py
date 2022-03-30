@@ -193,7 +193,7 @@ class DynamicsFactory():
         self.lam_mm_half = self.mat_frac_pow(self.lam_mm, 1/2)
         self.lam_mm_negHalf = self.mat_frac_pow(self.lam_mm, -1/2)
         self.alpha_mm_sq = self.alpha_md @ self.alpha_md.T
-        self.const_mm = self.lam_mm_negHalf @ self.mat_frac_pow(self.lam_mm_negHalf @ self.alpha_mm_sq @ self.lam_mm_negHalf, 1/2) @ self.lam_mm_half
+        self.const_mm = (GAMMA ** 2) * self.lam_mm_negHalf @ self.mat_frac_pow(self.lam_mm_negHalf @ self.alpha_mm_sq @ self.lam_mm_negHalf, 1/2) @ self.lam_mm_half
         self.sigma_tmm_sq = torch.einsum("ijk, ilk -> ijl", self.sigma_tmd, self.sigma_tmd)
         self.sigma_tmm_sq_inv = torch.zeros((T, N_STOCK, N_STOCK))
         for t in range(T):

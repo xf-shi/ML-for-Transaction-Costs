@@ -218,9 +218,7 @@ class DynamicsFactory():
         phi_stm[:, 0, :] = S_OUTSTANDING / 2
         phi_dot_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device=DEVICE)  # note here phi_dot has T+1 timesteps
         curr_t = torch.ones((N_SAMPLE, 1))
-        x = torch.cat((self.W_std[:, 0, :], curr_t), dim=1).to(device=DEVICE)
-        ###todo: parametrize the intitial value
-        phi_dot_stm[:, 0, :] = model((-1, x)) #[?]  # output is m-dim
+        phi_dot_stm[:, 0, :] = model((-1, curr_t)) #curr_t as dummy input
         for t in range(T):
             phi_stm[:, t + 1, :] = phi_stm[:, t, :] + phi_dot_stm[:, t, :] * TR / T
             x = torch.cat((self.W_std[:, t, :], t / T * TR * curr_t), dim=1).to(device=DEVICE)
@@ -417,6 +415,8 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
             phi_dot_stm, phi_stm = dynamic_factory.fbsde_quad(model)
         else:
             phi_dot_stm, phi_stm = dynamic_factory.fbsde_power(model)
+        ### to match the dim
+        phi_dot_stm = phi_dot_stm[:,:-1,:]
     elif algo == "leading_order":
         if cost == "quadratic":
             phi_dot_stm, phi_stm = dynamic_factory.leading_order_quad(model)
@@ -437,13 +437,13 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
         
 ## TODO: Adjust the arguments for training
 train_args = {
-    "algo": "deep_hedging",
+    "algo": "fbsde",
     "cost": "quadratic",
     "model_name": "discretized_feedforward",
     "solver": "Adam",
     "hidden_lst": [50, 50, 50],
     "lr": 1e-2,
-    "epoch": 10,
+    "epoch": 2,
     "decay": 0.1,
     "scheduler_step": 10000,
     "retrain": True,

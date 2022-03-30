@@ -173,11 +173,11 @@ class DynamicsFactory():
         self.lam_mm_negHalf = self.mat_frac_pow(self.lam_mm, -1/2)
         self.alpha_mm_sq = self.alpha_md @ self.alpha_md.T
         self.const_mm = self.lam_mm_negHalf @ self.mat_frac_pow(self.lam_mm_negHalf @ self.alpha_mm_sq @ self.lam_mm_negHalf, 1/2) @ self.lam_mm_half
-        self.sigma_tmm_sq = torch.einsum("ijk, ilj -> ikl", self.sigma_tmd, self.sigma_tmd)
+        self.sigma_tmm_sq = torch.einsum("ijk, ilk -> ijl", self.sigma_tmd, self.sigma_tmd)
         self.sigma_tmm_sq_inv = torch.zeros((T, N_STOCK, N_STOCK))
         for t in range(T):
             self.sigma_tmm_sq_inv[t,:,:] = torch.inverse(self.sigma_tmm_sq[t,:,:])
-        self.xi_std_w = torch.einsum("ijk, kl -> ijl", self.W_std, self.xi_dd)
+        self.xi_std_w = torch.einsum("ijk, kl -> ijl", self.W_std[:,1:,:], self.xi_dd)
         self.phi_stm_bar = 1 / GAMMA * torch.einsum("ijk, ik -> ij", self.sigma_tmm_sq_inv, self.mu_tm) - torch.einsum("jlk, ijk -> ijl", torch.einsum("ijk, ikl -> ijl", self.sigma_tmm_sq_inv, self.sigma_tmd), self.xi_std_w)
     
     def get_constant_processes(self):
@@ -185,7 +185,7 @@ class DynamicsFactory():
     
     def mat_frac_pow(self, mat, power):
         evals, evecs = torch.eig(mat, eigenvectors = True)
-        mat_ret = torch.matmul(evecs, torch.diag(evals ** power), torch.inverse(evecs))
+        mat_ret = torch.matmul(evecs, torch.matmul(torch.diag(evals[:,0] ** power), torch.inverse(evecs)))
         return mat_ret
     
     ## TODO: Implement it -- Daran Xu
@@ -399,4 +399,5 @@ train_args = {
 
 model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
 loss_eval = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0)
+#loss_eval = evaluation(dW_STD, "test", None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0)
 write_logs([prev_ts, curr_ts], train_args)

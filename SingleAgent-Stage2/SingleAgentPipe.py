@@ -20,8 +20,9 @@ T = 100 #
 TR = 1 #???
 N_SAMPLE = 128
 N_STOCK = 3
-GAMMA = 1/(1/ (8.91*1e-13) + 1/ (4.45 * 1e-12) )
-S_OUTSTANDING = torch.tensor([1.15, 0.32, 0.23]) *1e10
+COEF_ = 1e10
+S_OUTSTANDING = torch.tensor([1.15, 0.32, 0.23]) *1e10 / COEF_
+GAMMA = 1/(1/ (8.91*1e-13) + 1/ (4.45 * 1e-12) ) / COEF_
 BM_COV = torch.eye(3) #[[1, 0.5], [0.5, 1]]
 ## END HERE ##
 
@@ -36,23 +37,13 @@ def get_constants(dW_std):
     W_std = torch.cumsum(torch.cat((torch.zeros((N_SAMPLE, 1, N_BM)), dW_std), dim=1), dim=1)
     
     mu_tm = torch.tensor([[2.99, 3.71, 3.55]]).repeat(T,1)
-    sigma_tmd = torch.ones((T, N_STOCK, N_BM)) #???
-    #torch.tensor([[72.00, 71.49, 54.80],[71.49, 85.42, 65.86],[54.80, 65.86, 56.84]]) #???
+    sigma_big = torch.tensor([[72.00, 71.49, 54.80],[71.49, 85.42, 65.86],[54.80, 65.86, 56.84]])
+    sigma_tmd = solve_sigma_md_theoretical(sigma_big) #torch.ones((T, N_STOCK, N_BM)) #???
     s_tm = torch.ones((T, N_STOCK))
-    xi_dd = torch.tensor([[ -2.07, 1.91, 0.64],[1.91, -1.77, -0.59],[0.64 ,-0.59 ,-0.20]]) *1e9
-    lam_mm = torch.diag(torch.tensor([0.1269, 0.3354, 0.8595])) * 1e-8 #torch.ones((N_STOCK, N_STOCK))
+    xi_dd = torch.tensor([[ -2.07, 1.91, 0.64],[1.91, -1.77, -0.59],[0.64 ,-0.59 ,-0.20]]) *1e9 / COEF_
+    lam_mm = torch.diag(torch.tensor([0.1269, 0.3354, 0.8595])) * 1e-8 * COEF_ #torch.ones((N_STOCK, N_STOCK))
     alpha_md = torch.ones((N_STOCK, N_BM)) #???
     beta_m = torch.ones(N_STOCK) #???
-
-    ###
-#    mu_tm = torch.ones((T, N_STOCK))
-#    sigma_tmd = torch.ones((T, N_STOCK, N_BM))
-#    s_tm = torch.ones((T, N_STOCK))
-#    xi_dd = torch.ones((N_BM, N_BM))
-#    lam_mm = torch.eye(N_STOCK) #torch.ones((N_STOCK, N_STOCK))
-#    alpha_md = torch.ones((N_STOCK, N_BM))
-#    beta_m = torch.ones(N_STOCK)
-    ###
 
     return W_std.to(device = DEVICE), mu_tm.to(device = DEVICE), sigma_tmd.to(device = DEVICE), s_tm.to(device = DEVICE), xi_dd.to(device = DEVICE), lam_mm.to(device = DEVICE), alpha_md.to(device = DEVICE), beta_m.to(device = DEVICE)
 

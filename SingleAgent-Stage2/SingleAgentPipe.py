@@ -22,7 +22,7 @@ N_SAMPLE = 128
 N_STOCK = 3
 COEF_ = 1e10
 S_OUTSTANDING = torch.tensor([1.15, 0.32, 0.23]) *1e10 / COEF_
-GAMMA = 1/(1/ (8.91*1e-13) + 1/ (4.45 * 1e-12) ) / COEF_
+GAMMA = 1/(1/ (8.91*1e-13) + 1/ (4.45 * 1e-12) ) * COEF_
 BM_COV = torch.eye(3) #[[1, 0.5], [0.5, 1]]
 ## END HERE ##
 
@@ -475,7 +475,7 @@ train_args = {
     "solver": "Adam",
     "hidden_lst": [50, 50, 50],
     "lr": 1e-2,
-    "epoch": 1000,
+    "epoch": 100,
     "decay": 0.1,
     "scheduler_step": 10000,
     "retrain": True,

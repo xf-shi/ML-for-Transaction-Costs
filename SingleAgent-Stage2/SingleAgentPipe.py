@@ -294,7 +294,7 @@ class DynamicsFactory():
         phi_stm[:,0,:] = S_OUTSTANDING / 2
         phi_dot_stm = torch.zeros((N_SAMPLE, T, N_STOCK)).to(device = DEVICE)
         for t in range(T):
-            phi_dot_stm[:,t,:] = -(phi_stm[:,t,:] - self.phi_stm_bar[:,t,:]) @ self.const_mm @ torch.tanh(self.const_mm * (T - t))
+            phi_dot_stm[:,t,:] = -(phi_stm[:,t,:] - self.phi_stm_bar[:,t,:]) @ self.const_mm @ torch.tanh(self.const_mm * (T - t) / T * TR).T
             phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] * TR / T
         return phi_dot_stm, phi_stm
     
@@ -305,8 +305,9 @@ class DynamicsFactory():
         phi_dot_stm = torch.zeros((N_SAMPLE, T, N_STOCK)).to(device = DEVICE)
         curr_t = torch.ones((N_SAMPLE, 1))
         for t in range(T):
-            x = torch.cat((self.W_std[:,t,:], curr_t), dim = 1).to(device = DEVICE)
+            x = torch.cat((phi_stm[:,t,:], curr_t), dim = 1).to(device = DEVICE)
             phi_dot_stm[:,t,:] = model((t, x))
+#            phi_dot_stm[:,t,-1] = -torch.sum(phi_dot_stm[:,t,:-1])
             phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] * TR / T
         return phi_dot_stm, phi_stm
 
@@ -321,7 +322,7 @@ class LossFactory():
 
     ## TODO: Implement it -- Zhanhao Zhang
     def utility_loss(self, phi_dot_stm, phi_stm, power):
-        loss_mat = torch.einsum("ijk, jk -> ij", phi_stm[:,1:,:], self.mu_tm) - GAMMA / 2 * (torch.einsum("ijk, jkl -> ij", phi_stm[:,1:,:], self.sigma_tmd) + torch.einsum("ijk, kl -> ij", self.W_std[:,1:,:], self.xi_dd)) ** 2 - 1 / 2 * torch.einsum("ijk, lk, ijl -> ij", phi_dot_stm, self.lam_mm, phi_dot_stm)
+        loss_mat = torch.einsum("ijk, jk -> ij", phi_stm[:,1:,:], self.mu_tm) - GAMMA / 2 * torch.einsum("ijk -> ij", (torch.einsum("ijk, jkl -> ijl", phi_stm[:,1:,:], self.sigma_tmd) + torch.einsum("ijk, kl -> ijl", self.W_std[:,1:,:], self.xi_dd)) ** 2) - 1 / 2 * torch.einsum("ijk, lk, ijl -> ij", phi_dot_stm, self.lam_mm, phi_dot_stm)
         loss_compact = -torch.sum(loss_mat * TR / T) / N_SAMPLE
         return loss_compact
     
@@ -340,11 +341,11 @@ def write_logs(ts_lst, train_args):
             f.write(line)
 
 ## Visualize loss function through training
-def visualize_loss(loss_arr, ts):
+def visualize_loss(loss_arr, ts, loss_truth):
     plt.plot(loss_arr)
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
-    plt.title("Loss")
+    plt.title(f"Final Loss = {round(loss_arr[-1], 2)}, True Loss = {round(loss_truth, 2)}")
     plt.savefig(f"Plots/loss_{ts}.png")
     plt.close()
 
@@ -456,8 +457,12 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
     model_factory.update_model(model)
     curr_ts = model_factory.save_to_file()
     
+    ## Compute Ground Truth
+    phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_truth = evaluation(dW_std, curr_ts, None, algo = "ground_truth", cost = cost, visualize_obs = 0)
+    phi_dot_stm_leading_order, phi_stm_leading_order, loss_leading_order = evaluation(dW_std, curr_ts, None, algo = "leading_order", cost = cost, visualize_obs = 0)
+    
     ## Visualize loss and results
-    visualize_loss(loss_arr, curr_ts)
+    visualize_loss(loss_arr, curr_ts, loss_truth)
     return model, loss_arr, prev_ts, curr_ts
 
 def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "quadratic", visualize_obs = 0):
@@ -501,9 +506,9 @@ train_args = {
     "algo": "deep_hedging",
     "cost": "quadratic",
     "model_name": "discretized_feedforward",
-    "solver": "Adam",
-    "hidden_lst": [50, 50, 50],
-    "lr": 1e-1,
+    "solver": "RMSprop",
+    "hidden_lst": [50],
+    "lr": 1e-2,
     "epoch": 100,
     "decay": 0.1,
     "scheduler_step": 10000,

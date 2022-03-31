@@ -27,7 +27,7 @@ BM_COV = torch.eye(3) #[[1, 0.5], [0.5, 1]]
 ## END HERE ##
 
 TIMESTAMPS = np.linspace(0, TR, T + 1)
-BM_COV = torch.tensor(BM_COV)
+#BM_COV = torch.tensor(BM_COV)
 assert len(BM_COV.shape) == 2 and BM_COV.shape[0] == BM_COV.shape[1] and BM_COV.shape[0]
 N_BM = BM_COV.shape[0]
 
@@ -38,7 +38,8 @@ def get_constants(dW_std):
     
     mu_tm = torch.tensor([[2.99, 3.71, 3.55]]).repeat(T,1)
     sigma_big = torch.tensor([[72.00, 71.49, 54.80],[71.49, 85.42, 65.86],[54.80, 65.86, 56.84]])
-    sigma_tmd = solve_sigma_md_theoretical(sigma_big) #torch.ones((T, N_STOCK, N_BM)) #???
+    sigma_md = solve_sigma_md_theoretical(sigma_big) #torch.ones((T, N_STOCK, N_BM)) #???
+    sigma_tmd = torch.ones((T, N_STOCK, N_BM)) * sigma_md
     s_tm = torch.ones((T, N_STOCK))
     xi_dd = torch.tensor([[ -2.07, 1.91, 0.64],[1.91, -1.77, -0.59],[0.64 ,-0.59 ,-0.20]]) *1e9 / COEF_
     lam_mm = torch.diag(torch.tensor([0.1269, 0.3354, 0.8595])) * 1e-8 * COEF_ #torch.ones((N_STOCK, N_STOCK))
@@ -468,13 +469,13 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
         
 ## TODO: Adjust the arguments for training
 train_args = {
-    "algo": "fbsde",
+    "algo": "deep_hedging",
     "cost": "quadratic",
     "model_name": "discretized_feedforward",
     "solver": "Adam",
     "hidden_lst": [50, 50, 50],
     "lr": 1e-2,
-    "epoch": 2,
+    "epoch": 1000,
     "decay": 0.1,
     "scheduler_step": 10000,
     "retrain": True,

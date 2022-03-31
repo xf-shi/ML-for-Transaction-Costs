@@ -43,7 +43,7 @@ def get_constants(dW_std):
     s_tm = torch.ones((T, N_STOCK))
     xi_dd = torch.tensor([[ -2.07, 1.91, 0.64],[1.91, -1.77, -0.59],[0.64 ,-0.59 ,-0.20]]) *1e9 / COEF_
     lam_mm = torch.diag(torch.tensor([0.1269, 0.3354, 0.8595])) * 1e-8 * COEF_ #torch.ones((N_STOCK, N_STOCK))
-    alpha_md = torch.ones((N_STOCK, N_BM)) #???
+    alpha_md = sigma_md.clone() #torch.ones((N_STOCK, N_BM)) #???
     beta_m = torch.ones(N_STOCK) #???
 
     return W_std.to(device = DEVICE), mu_tm.to(device = DEVICE), sigma_tmd.to(device = DEVICE), s_tm.to(device = DEVICE), xi_dd.to(device = DEVICE), lam_mm.to(device = DEVICE), alpha_md.to(device = DEVICE), beta_m.to(device = DEVICE)
@@ -376,6 +376,35 @@ def Visualize_dyn(timestamps, arr, ts, name):
     plt.savefig(f"Plots/{name}_{ts}.png")
     plt.close()
 
+## Visualize the comparision of dynamics from different algorithms
+def Visualize_dyn_comp(timestamps, arr_lst, ts, name, algo_lst):
+    assert name in ["phi", "phi_dot", "sigma", "mu", "s"]
+    if name == "phi":
+        title = "${\\varphi}_t$"
+    elif name == "phi_dot":
+        title = "$\dot{\\varphi}_t$"
+    elif name == "sigma":
+        title = "$\sigma_t$"
+    elif name == "mu":
+        title = "$\mu_t$"
+    else:
+        title = "$S_t$"
+    for arr, algo in zip(arr_lst, algo_lst):
+        arr = arr.cpu().detach().numpy()
+        if len(arr.shape) == 2 and arr.shape[1] == 1:
+            arr = arr.reshape((-1,))
+        if len(arr.shape) == 1:
+            plt.plot(timestamps, arr)
+        else:
+            for i in range(arr.shape[1]):
+                plt.plot(timestamps, arr[:, i], label = f"{algo} - Stock {i + 1}")
+    plt.xlabel("T")
+    plt.ylabel(title)
+    plt.title(title)
+    plt.legend()
+    plt.savefig(f"Plots/comp_{name}_{ts}.png")
+    plt.close()
+
 ## The training pipeline
 def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "discretized_feedforward", solver = "Adam", hidden_lst = [50], lr = 1e-2, epoch = 1000, decay = 0.1, scheduler_step = 10000, retrain = False):
     assert algo in ["deep_hedging", "fbsde"]
@@ -439,7 +468,7 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
     else:
         power = 3 / 2
     dynamic_factory = DynamicsFactory(TIMESTAMPS, dW_std)
-    W_std, mu_tm, sigma_tm, s_tm, xi_dd, lam_mm, alpha_md, beta_m = dynamic_factory.get_constant_processes()
+    W_std, mu_tm, sigma_tmd, s_tm, xi_dd, lam_mm, alpha_md, beta_m = dynamic_factory.get_constant_processes()
     if algo == "deep_hedging":
         phi_dot_stm, phi_stm = dynamic_factory.deep_hedging(model)
     elif algo == "fbsde":
@@ -460,12 +489,12 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
     loss_factory = LossFactory(TIMESTAMPS, dW_std)
     loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power)
     
-    Visualize_dyn(TIMESTAMPS[1:], phi_stm[0,1:,:], curr_ts, "phi")
-    Visualize_dyn(TIMESTAMPS[1:], phi_dot_stm[0,:,:], curr_ts, "phi_dot")
-    Visualize_dyn(TIMESTAMPS[1:], sigma_tm, curr_ts, "sigma")
-    Visualize_dyn(TIMESTAMPS[1:], mu_tm, curr_ts, "mu")
-    Visualize_dyn(TIMESTAMPS[1:], s_tm, curr_ts, "s")
-    return float(loss.data)
+#    Visualize_dyn(TIMESTAMPS[1:], phi_stm[0,1:,:], curr_ts, "phi")
+#    Visualize_dyn(TIMESTAMPS[1:], phi_dot_stm[0,:,:], curr_ts, "phi_dot")
+#    Visualize_dyn(TIMESTAMPS[1:], sigma_tmd, curr_ts, "sigma")
+#    Visualize_dyn(TIMESTAMPS[1:], mu_tm, curr_ts, "mu")
+#    Visualize_dyn(TIMESTAMPS[1:], s_tm, curr_ts, "s")
+    return phi_dot_stm, phi_stm, float(loss.data)
         
 ## TODO: Adjust the arguments for training
 train_args = {
@@ -474,7 +503,7 @@ train_args = {
     "model_name": "discretized_feedforward",
     "solver": "Adam",
     "hidden_lst": [50, 50, 50],
-    "lr": 1e-2,
+    "lr": 1e-1,
     "epoch": 100,
     "decay": 0.1,
     "scheduler_step": 10000,
@@ -482,6 +511,9 @@ train_args = {
 }
 
 model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
-loss_eval = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0)
-#loss_eval = evaluation(dW_STD, "test", None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0)
+phi_dot_stm_deep_hedging, phi_stm_deep_hedging, loss_eval_deep_hedging = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0)
+phi_dot_stm_leading_order, phi_stm_leading_order, loss_eval_leading_order = evaluation(dW_STD, curr_ts, None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0)
+phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_eval_ground_truth = evaluation(dW_STD, curr_ts, None, algo = "ground_truth", cost = train_args["cost"], visualize_obs = 0)
+Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_deep_hedging[0,1:,:], phi_stm_leading_order[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts, "phi", ["deep_hedging", "leading_order", "ground_truth"])
+Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_deep_hedging[0,:,:], phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts, "phi_dot", ["deep_hedging", "leading_order", "ground_truth"])
 write_logs([prev_ts, curr_ts], train_args)

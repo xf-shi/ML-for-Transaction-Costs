@@ -220,8 +220,8 @@ class DynamicsFactory():
         self.const_mm = (GAMMA ** (1/2)) * self.lam_mm_negHalf @ self.mat_frac_pow(self.lam_mm_negHalf @ self.alpha_mm_sq @ self.lam_mm_negHalf, 1/2) @ self.lam_mm_half
         self.sigma_tmm_sq = torch.einsum("ijk, ilk -> ijl", self.sigma_tmd, self.sigma_tmd)
         self.sigma_tmm_sq_inv = torch.zeros((T, N_STOCK, N_STOCK))
-        #for t in range(T):
-        #    self.sigma_tmm_sq_inv[t,:,:] = torch.inverse(self.sigma_tmm_sq[t,:,:]) #self.sigma_tmm_sq_inv[t,:,:] #
+        for t in range(T):
+            self.sigma_tmm_sq_inv[t,:,:] = torch.inverse(self.sigma_tmm_sq[t,:,:]) #self.sigma_tmm_sq_inv[t,:,:] #
         self.xi_std_w = torch.einsum("ijk, kl -> ijl", self.W_std[:,1:,:], self.xi_dd)
         self.phi_stm_bar = 1 / GAMMA * torch.einsum("ijk, ik -> ij", self.sigma_tmm_sq_inv, self.mu_tm) - torch.einsum("jlk, ijk -> ijl", torch.einsum("ijk, ikl -> ijl", self.sigma_tmm_sq_inv, self.sigma_tmd), self.xi_std_w)
     

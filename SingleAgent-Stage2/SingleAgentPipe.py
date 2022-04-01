@@ -36,17 +36,17 @@ N_BM = BM_COV.shape[0]
 def get_constants(dW_std):
     W_std = torch.cumsum(torch.cat((torch.zeros((N_SAMPLE, 1, N_BM)), dW_std), dim=1), dim=1)
     
-    mu_tm = torch.tensor([[2.99, 3.71, 3.55]]).repeat(T,1)
+    mu_stm = torch.ones((N_SAMPLE, T, N_STOCK)) * torch.tensor([[2.99, 3.71, 3.55]]) #torch.tensor([[2.99, 3.71, 3.55]]).repeat(T,1)
     sigma_big = torch.tensor([[72.00, 71.49, 54.80],[71.49, 85.42, 65.86],[54.80, 65.86, 56.84]])
     sigma_md = solve_sigma_md_theoretical(sigma_big) #torch.ones((T, N_STOCK, N_BM)) #???
-    sigma_tmd = torch.ones((T, N_STOCK, N_BM)) * sigma_md
+    sigma_stmd = torch.ones((N_SAMPLE, T, N_STOCK, N_BM)) * sigma_md
     s_tm = torch.ones((T, N_STOCK))
     xi_dd = torch.tensor([[ -2.07, 1.91, 0.64],[1.91, -1.77, -0.59],[0.64 ,-0.59 ,-0.20]]) *1e9 / COEF_
     lam_mm = torch.diag(torch.tensor([0.1269, 0.3354, 0.8595])) * 1e-8 * COEF_ #torch.ones((N_STOCK, N_STOCK))
     alpha_md = sigma_md.clone() #torch.ones((N_STOCK, N_BM)) #???
     beta_m = torch.ones(N_STOCK) #???
 
-    return W_std.to(device = DEVICE), mu_tm.to(device = DEVICE), sigma_tmd.to(device = DEVICE), s_tm.to(device = DEVICE), xi_dd.to(device = DEVICE), lam_mm.to(device = DEVICE), alpha_md.to(device = DEVICE), beta_m.to(device = DEVICE)
+    return W_std.to(device = DEVICE), mu_stm.to(device = DEVICE), sigma_stmd.to(device = DEVICE), s_tm.to(device = DEVICE), xi_dd.to(device = DEVICE), lam_mm.to(device = DEVICE), alpha_md.to(device = DEVICE), beta_m.to(device = DEVICE)
 
 ## Solve for sigma assuming square matrix
 def solve_sigma_md_theoretical(sigma_mm_cov):
@@ -80,7 +80,7 @@ torch.manual_seed(0)
 
 MULTI_NORMAL = MultivariateNormal(torch.zeros((N_SAMPLE, T, N_BM)), BM_COV)
 dW_STD = MULTI_NORMAL.sample().to(device = DEVICE)
-W_STD, MU_TM, SIGMA_TMD, S_TM, XI_DD, LAM_MM, ALPHA_MD, BETA_M = get_constants(dW_STD)
+W_STD, MU_STM, SIGMA_STMD, S_TM, XI_DD, LAM_MM, ALPHA_MD, BETA_M = get_constants(dW_STD)
 
 ## Neural network learning a single value
 class S_0(nn.Module):
@@ -213,20 +213,21 @@ class DynamicsFactory():
     def __init__(self, ts_lst, dW_std):
         assert ts_lst[0] == 0
         self.dW_std = dW_std
-        self.W_std, self.mu_tm, self.sigma_tmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m = get_constants(dW_std)
+        self.W_std, self.mu_stm, self.sigma_stmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m = get_constants(dW_std)
         self.lam_mm_half = self.mat_frac_pow(self.lam_mm, 1/2)
         self.lam_mm_negHalf = self.mat_frac_pow(self.lam_mm, -1/2)
         self.alpha_mm_sq = self.alpha_md @ self.alpha_md.T
         self.const_mm = (GAMMA ** (1/2)) * self.lam_mm_negHalf @ self.mat_frac_pow(self.lam_mm_negHalf @ self.alpha_mm_sq @ self.lam_mm_negHalf, 1/2) @ self.lam_mm_half
-        self.sigma_tmm_sq = torch.einsum("ijk, ilk -> ijl", self.sigma_tmd, self.sigma_tmd)
-        self.sigma_tmm_sq_inv = torch.zeros((T, N_STOCK, N_STOCK))
-        for t in range(T):
-            self.sigma_tmm_sq_inv[t,:,:] = torch.inverse(self.sigma_tmm_sq[t,:,:]) #self.sigma_tmm_sq_inv[t,:,:] #
+        self.sigma_stmm_sq = torch.einsum("sijk, silk -> sijl", self.sigma_stmd, self.sigma_stmd)
+        self.sigma_stmm_sq_inv = torch.zeros((N_SAMPLE, T, N_STOCK, N_STOCK))
+        for s in range(N_SAMPLE):
+            for t in range(T):
+                self.sigma_stmm_sq_inv[s,t,:,:] = torch.inverse(self.sigma_stmm_sq[s,t,:,:]) #self.sigma_stmm_sq_inv[t,:,:] #
         self.xi_std_w = torch.einsum("ijk, kl -> ijl", self.W_std[:,1:,:], self.xi_dd)
-        self.phi_stm_bar = 1 / GAMMA * torch.einsum("ijk, ik -> ij", self.sigma_tmm_sq_inv, self.mu_tm) - torch.einsum("jlk, ijk -> ijl", torch.einsum("ijk, ikl -> ijl", self.sigma_tmm_sq_inv, self.sigma_tmd), self.xi_std_w)
+        self.phi_stm_bar = 1 / GAMMA * torch.einsum("sijk, sik -> sij", self.sigma_stmm_sq_inv, self.mu_stm) - torch.einsum("ijlk, ijk -> ijl", torch.einsum("sijk, sikl -> sijl", self.sigma_stmm_sq_inv, self.sigma_stmd), self.xi_std_w)
     
     def get_constant_processes(self):
-        return self.W_std, self.mu_tm, self.sigma_tmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m
+        return self.W_std, self.mu_stm, self.sigma_stmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m
     
     def mat_frac_pow(self, mat, power):
         evals, evecs = torch.eig(mat, eigenvectors = True)
@@ -317,12 +318,12 @@ class LossFactory():
     def __init__(self, ts_lst, dW_std):
         assert ts_lst[0] == 0
         self.dW_std = dW_std
-        self.W_std, self.mu_tm, self.sigma_tmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m = get_constants(dW_std)
+        self.W_std, self.mu_stm, self.sigma_stmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m = get_constants(dW_std)
         self.mse_loss_func=torch.nn.MSELoss()
 
     ## TODO: Implement it -- Zhanhao Zhang
     def utility_loss(self, phi_dot_stm, phi_stm, power):
-        loss_mat = torch.einsum("ijk, jk -> ij", phi_stm[:,1:,:], self.mu_tm) - GAMMA / 2 * torch.einsum("ijk -> ij", (torch.einsum("ijk, jkl -> ijl", phi_stm[:,1:,:], self.sigma_tmd) + torch.einsum("ijk, kl -> ijl", self.W_std[:,1:,:], self.xi_dd)) ** 2) - 1 / 2 * torch.einsum("ijk, lk, ijl -> ij", phi_dot_stm, self.lam_mm, phi_dot_stm)
+        loss_mat = torch.einsum("ijk, ijk -> ij", phi_stm[:,1:,:], self.mu_stm) - GAMMA / 2 * torch.einsum("ijk -> ij", (torch.einsum("ijk, ijkl -> ijl", phi_stm[:,1:,:], self.sigma_stmd) + torch.einsum("ijk, kl -> ijl", self.W_std[:,1:,:], self.xi_dd)) ** 2) - 1 / 2 * torch.einsum("ijk, lk, ijl -> ij", phi_dot_stm, self.lam_mm, phi_dot_stm)
         loss_compact = -torch.sum(loss_mat * TR / T) / N_SAMPLE
         return loss_compact
     
@@ -473,7 +474,7 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
     else:
         power = 3 / 2
     dynamic_factory = DynamicsFactory(TIMESTAMPS, dW_std)
-    W_std, mu_tm, sigma_tmd, s_tm, xi_dd, lam_mm, alpha_md, beta_m = dynamic_factory.get_constant_processes()
+    W_std, mu_stm, sigma_stmd, s_tm, xi_dd, lam_mm, alpha_md, beta_m = dynamic_factory.get_constant_processes()
     if algo == "deep_hedging":
         phi_dot_stm, phi_stm = dynamic_factory.deep_hedging(model)
     elif algo == "fbsde":
@@ -496,8 +497,8 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
     
 #    Visualize_dyn(TIMESTAMPS[1:], phi_stm[0,1:,:], curr_ts, "phi")
 #    Visualize_dyn(TIMESTAMPS[1:], phi_dot_stm[0,:,:], curr_ts, "phi_dot")
-#    Visualize_dyn(TIMESTAMPS[1:], sigma_tmd, curr_ts, "sigma")
-#    Visualize_dyn(TIMESTAMPS[1:], mu_tm, curr_ts, "mu")
+#    Visualize_dyn(TIMESTAMPS[1:], sigma_stmd, curr_ts, "sigma")
+#    Visualize_dyn(TIMESTAMPS[1:], mu_stm, curr_ts, "mu")
 #    Visualize_dyn(TIMESTAMPS[1:], s_tm, curr_ts, "s")
     return phi_dot_stm, phi_stm, float(loss.data)
         
@@ -508,10 +509,10 @@ train_args = {
     "model_name": "discretized_feedforward",
     "solver": "SGD",
     "hidden_lst": [50],
-    "lr": 1e-1,
+    "lr": 1e-2,
     "epoch": 100,
     "decay": 0.1,
-    "scheduler_step": 10000,
+    "scheduler_step": 100,
     "retrain": True,
 }
 
@@ -519,6 +520,8 @@ model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
 phi_dot_stm_deep_hedging, phi_stm_deep_hedging, loss_eval_deep_hedging = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0)
 phi_dot_stm_leading_order, phi_stm_leading_order, loss_eval_leading_order = evaluation(dW_STD, curr_ts, None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0)
 phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_eval_ground_truth = evaluation(dW_STD, curr_ts, None, algo = "ground_truth", cost = train_args["cost"], visualize_obs = 0)
-Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_deep_hedging[0,1:,:], phi_stm_leading_order[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts, "phi", ["deep_hedging", "leading_order", "ground_truth"])
-Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_deep_hedging[0,:,:], phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts, "phi_dot", ["deep_hedging", "leading_order", "ground_truth"])
+#Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_deep_hedging[0,1:,:], phi_stm_leading_order[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts, "phi", ["deep_hedging", "leading_order", "ground_truth"])
+#Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_deep_hedging[0,:,:], phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts, "phi_dot", ["deep_hedging", "leading_order", "ground_truth"])
+Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_deep_hedging[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts, "phi", ["deep_hedging", "ground_truth"])
+Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_deep_hedging[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts, "phi_dot", ["deep_hedging", "ground_truth"])
 write_logs([prev_ts, curr_ts], train_args)

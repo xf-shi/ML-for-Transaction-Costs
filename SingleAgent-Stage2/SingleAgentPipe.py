@@ -248,10 +248,20 @@ class DynamicsFactory():
             phi_stm[:, t + 1, :] = phi_stm[:, t, :] + phi_dot_stm[:, t, :] * TR / T
             x = torch.cat((self.W_std[:, t, :], t / T * TR * curr_t), dim=1).to(device=DEVICE)
             Z_stmd[:, t, :, :] = model((t, x)).reshape(N_SAMPLE, N_STOCK, N_BM)
-            phi_dot_stm[:, t + 1, :] = phi_dot_stm[:, t, :] + \
+            """phi_dot_stm[:, t + 1, :] = phi_dot_stm[:, t, :] + \
                                        +TR / T * GAMMA * torch.einsum("ij,bj -> bi", torch.mm(
                 torch.mm(torch.inverse(self.lam_mm), self.sigma_tmd[t, :, :]), self.sigma_tmd[t, :, :].T),
                                                                       (phi_stm[:, t, :] - self.phi_stm_bar[:, t, :]))+\
+                +torch.einsum('bik, bk -> bi', Z_stmd[:, t, :, :], self.dW_std[:, t, :])"""
+
+            phi_dot_stm[:, t + 1, :] = phi_dot_stm[:, t, :] + \
+                +TR / T * GAMMA * torch.einsum("bij,bj -> bi",
+                                               torch.einsum("bij,bkj -> bik",
+                                                    torch.einsum("ji ,bik->bjk",
+                                                                 torch.inverse(self.lam_mm), self.sigma_stmd[:,t, :, :]),
+                                                            self.sigma_stmd[:,t, :, :]),
+                                                (phi_stm[:, t, :] - self.phi_stm_bar[:, t, :])
+                                               ) + \
                 +torch.einsum('bik, bk -> bi', Z_stmd[:, t, :, :], self.dW_std[:, t, :])
             """
             +TR / T * GAMMA * torch.einsum("ij,bj -> bi", torch.mm(torch.mm(torch.inverse(self.lam_mm), self.sigma_tmd[t, :, :]), self.sigma_tmd[t, :, :].T), phi_stm[:, t, :]) - TR / T * torch.matmul(torch.inverse(self.lam_mm), self.mu_tm[t, :]) + TR / T * GAMMA * torch.einsum("md,sd -> sm", torch.mm(torch.mm(torch.inverse(self.lam_mm), self.sigma_tmd[t, :, :]), self.xi_dd), self.W_std[:, t, :]) +\
@@ -504,7 +514,7 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
         
 ## TODO: Adjust the arguments for training
 train_args = {
-    "algo": "deep_hedging",
+    "algo": "fbsde",
     "cost": "quadratic",
     "model_name": "discretized_feedforward",
     "solver": "SGD",
@@ -516,6 +526,7 @@ train_args = {
     "retrain": True,
 }
 
+"""
 model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
 phi_dot_stm_deep_hedging, phi_stm_deep_hedging, loss_eval_deep_hedging = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0)
 phi_dot_stm_leading_order, phi_stm_leading_order, loss_eval_leading_order = evaluation(dW_STD, curr_ts, None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0)
@@ -524,4 +535,17 @@ phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_eval_ground_truth = evaluat
 #Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_deep_hedging[0,:,:], phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts, "phi_dot", ["deep_hedging", "leading_order", "ground_truth"])
 Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_deep_hedging[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts, "phi", ["deep_hedging", "ground_truth"])
 Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_deep_hedging[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts, "phi_dot", ["deep_hedging", "ground_truth"])
+write_logs([prev_ts, curr_ts], train_args)
+"""
+
+
+model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
+phi_dot_stm_fbsde, phi_stm_fbsde, loss_eval_fbsde = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0)
+phi_dot_stm_leading_order, phi_stm_leading_order, loss_eval_leading_order = evaluation(dW_STD, curr_ts, None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0)
+phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_eval_ground_truth = evaluation(dW_STD, curr_ts, None, algo = "ground_truth", cost = train_args["cost"], visualize_obs = 0)
+#Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_fbsde[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts, "phi", ["fbsde", "ground_truth"])
+#Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_fbsde[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts, "phi_dot", ["fbsde", "ground_truth"])
+Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_fbsde[0,1:,0], phi_stm_ground_truth[0,1:,0]], curr_ts, "phi", ["fbsde", "ground_truth"])
+Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_fbsde[0,:,0], phi_dot_stm_ground_truth[0,:,0]], curr_ts, "phi_dot", ["fbsde", "ground_truth"])
+
 write_logs([prev_ts, curr_ts], train_args)

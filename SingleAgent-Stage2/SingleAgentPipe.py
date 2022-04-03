@@ -406,7 +406,7 @@ def Visualize_dyn_comp(timestamps, arr_lst, ts, name, algo_lst):
         if len(arr.shape) == 2 and arr.shape[1] == 1:
             arr = arr.reshape((-1,))
         if len(arr.shape) == 1:
-            plt.plot(timestamps, arr)
+            plt.plot(timestamps, arr,label = f"{algo}")
         else:
             for i in range(arr.shape[1]):
                 plt.plot(timestamps, arr[:, i], label = f"{algo} - Stock {i + 1}")
@@ -520,7 +520,7 @@ train_args = {
     "solver": "SGD",
     "hidden_lst": [50],
     "lr": 1e-2,
-    "epoch": 100,
+    "epoch": 1,
     "decay": 0.1,
     "scheduler_step": 100,
     "retrain": True,

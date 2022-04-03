@@ -144,9 +144,10 @@ class ModelFactory:
         self.model = None
         self.prev_ts = None
         self.algo = algo
-        
+
         if not retrain:
             self.model, self.prev_ts = self.load_latest()
+
         if self.model is None:
             if model_name == "discretized_feedforward":
                 self.model = self.discretized_feedforward()
@@ -198,11 +199,12 @@ class ModelFactory:
         return curr_ts
     
     def load_latest(self):
-        ts_lst = [f.strip(".pt").split("__")[1] for f in os.listdir("Models/") if f.endswith(".pt") and f.startswith(self.model_name)]
+        ts_lst = [f.strip(".pt").split("__")[1] for f in os.listdir("Models/") if f.endswith(".pt") and f.startswith(self.algo+"_"+self.model_name)] #f.startswith(self.model_name)
         ts_lst = sorted(ts_lst, reverse=True)
         if len(ts_lst) == 0:
             return None, None
         ts = ts_lst[0]
+
         model = torch.load(f"Models/{self.algo}_{self.model_name}__{ts}.pt")
         model = model.to(device = DEVICE)
         return model, ts
@@ -418,7 +420,8 @@ def Visualize_dyn_comp(timestamps, arr_lst, ts, name, algo_lst):
     plt.close()
 
 ## The training pipeline
-def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "discretized_feedforward", solver = "Adam", hidden_lst = [50], lr = 1e-2, epoch = 1000, decay = 0.1, scheduler_step = 10000, retrain = False):
+def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "discretized_feedforward", solver = "Adam",
+                      hidden_lst = [50], lr = 1e-2, epoch = 1000, decay = 0.1, scheduler_step = 10000, retrain = False):
     assert algo in ["deep_hedging", "fbsde"]
     assert cost in ["quadratic", "power"]
     assert model_name in ["discretized_feedforward", "rnn"]
@@ -435,8 +438,12 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
     else:
         output_dim = N_BM * N_STOCK
     model_factory = ModelFactory(algo, model_name, N_BM + 1, hidden_lst, output_dim, lr, decay, scheduler_step, solver, retrain)
+
     model, optimizer, scheduler, prev_ts = model_factory.prepare_model()
-    
+
+
+
+
     loss_arr = []
     
     for itr in tqdm(range(epoch)):
@@ -519,10 +526,10 @@ train_args = {
     "model_name": "discretized_feedforward",
     "solver": "SGD",
     "hidden_lst": [50],
-    "lr": 1e-2,
+    "lr": 1e-3,
     "epoch": 1,
     "decay": 0.1,
-    "scheduler_step": 100,
+    "scheduler_step": 1000,
     "retrain": True,
 }
 
@@ -549,3 +556,4 @@ Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_fbsde[0,1:,0], phi_stm_ground_truth[
 Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_fbsde[0,:,0], phi_dot_stm_ground_truth[0,:,0]], curr_ts, "phi_dot", ["fbsde", "ground_truth"])
 
 write_logs([prev_ts, curr_ts], train_args)
+print("utility loss for FBSDE: {}".format(loss_eval_fbsde))

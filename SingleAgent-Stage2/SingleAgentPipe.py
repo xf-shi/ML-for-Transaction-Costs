@@ -17,7 +17,7 @@ import sys
 
 ## TODO: Adjust these global constants:
 T = 100 #
-TR = 1 #???
+TR = 10 #???
 N_SAMPLE = 128
 N_STOCK = 3
 COEF_ = 1e10
@@ -219,7 +219,7 @@ class DynamicsFactory():
         self.lam_mm_half = self.mat_frac_pow(self.lam_mm, 1/2)
         self.lam_mm_negHalf = self.mat_frac_pow(self.lam_mm, -1/2)
         self.alpha_mm_sq = self.alpha_md @ self.alpha_md.T
-        self.const_mm = (GAMMA ** (1/2)) * self.lam_mm_negHalf @ self.mat_frac_pow(self.lam_mm_negHalf @ self.alpha_mm_sq @ self.lam_mm_negHalf, 1/2) @ self.lam_mm_half
+        self.const_mm = (GAMMA ** (1/2)) * self.mat_frac_pow(self.lam_mm_negHalf @ self.alpha_mm_sq @ self.lam_mm_negHalf, 1/2) #(GAMMA ** (1/2)) * self.lam_mm_negHalf @ self.mat_frac_pow(self.lam_mm_negHalf @ self.alpha_mm_sq @ self.lam_mm_negHalf, 1/2) @ self.lam_mm_half
         self.sigma_stmm_sq = torch.einsum("sijk, silk -> sijl", self.sigma_stmd, self.sigma_stmd)
         self.sigma_stmm_sq_inv = torch.zeros((N_SAMPLE, T, N_STOCK, N_STOCK))
         for s in range(N_SAMPLE):

@@ -307,7 +307,11 @@ class DynamicsFactory():
         phi_stm[:,0,:] = S_OUTSTANDING / 2
         phi_dot_stm = torch.zeros((N_SAMPLE, T, N_STOCK)).to(device = DEVICE)
         for t in range(T):
-            phi_dot_stm[:,t,:] = -(phi_stm[:,t,:] - self.phi_stm_bar[:,t,:]) @ self.const_mm @ torch.tanh(self.const_mm * (T - t) / T * TR).T
+            tanh_inner = 2 * self.const_mm * (T - t) / T * TR
+            evals, evecs = torch.eig(tanh_inner, eigenvectors = True)
+            tanh_exp = torch.matmul(evecs, torch.matmul(torch.diag(torch.exp(evals[:,0])), torch.inverse(evecs)))
+            tanh_tmp = 1 - 2 * torch.inverse(tanh_exp + 1)
+            phi_dot_stm[:,t,:] = -(phi_stm[:,t,:] - self.phi_stm_bar[:,t,:]) @ self.const_mm @ tanh_tmp #torch.tanh(self.const_mm * (T - t) / T * TR).T
             phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] * TR / T
         return phi_dot_stm, phi_stm
     
@@ -440,10 +444,6 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
     model_factory = ModelFactory(algo, model_name, N_BM + 1, hidden_lst, output_dim, lr, decay, scheduler_step, solver, retrain)
 
     model, optimizer, scheduler, prev_ts = model_factory.prepare_model()
-
-
-
-
     loss_arr = []
     
     for itr in tqdm(range(epoch)):
@@ -521,13 +521,13 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
         
 ## TODO: Adjust the arguments for training
 train_args = {
-    "algo": "fbsde",
+    "algo": "deep_hedging",
     "cost": "quadratic",
     "model_name": "discretized_feedforward",
-    "solver": "SGD",
+    "solver": "Adam",
     "hidden_lst": [50],
-    "lr": 1e-3,
-    "epoch": 1,
+    "lr": 1e-2,
+    "epoch": 100,
     "decay": 0.1,
     "scheduler_step": 1000,
     "retrain": True,
@@ -547,13 +547,14 @@ write_logs([prev_ts, curr_ts], train_args)
 
 
 model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
-phi_dot_stm_fbsde, phi_stm_fbsde, loss_eval_fbsde = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0)
+phi_dot_stm_algo, phi_stm_algo, loss_eval_algo = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0)
 phi_dot_stm_leading_order, phi_stm_leading_order, loss_eval_leading_order = evaluation(dW_STD, curr_ts, None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0)
 phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_eval_ground_truth = evaluation(dW_STD, curr_ts, None, algo = "ground_truth", cost = train_args["cost"], visualize_obs = 0)
-#Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_fbsde[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts, "phi", ["fbsde", "ground_truth"])
-#Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_fbsde[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts, "phi_dot", ["fbsde", "ground_truth"])
-Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_fbsde[0,1:,0], phi_stm_ground_truth[0,1:,0]], curr_ts, "phi", ["fbsde", "ground_truth"])
-Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_fbsde[0,:,0], phi_dot_stm_ground_truth[0,:,0]], curr_ts, "phi_dot", ["fbsde", "ground_truth"])
+
+#Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_algo[0,1:,0], phi_stm_ground_truth[0,1:,0]], curr_ts, "phi", [train_args["algo"], "ground_truth"])
+#Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_algo[0,:,0], phi_dot_stm_ground_truth[0,:,0]], curr_ts, "phi_dot", [train_args["algo"], "ground_truth"])
+Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_algo[0,1:,:], phi_stm_leading_order[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts, "phi", [train_args["algo"], "leading_order", "ground_truth"])
+Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_algo[0,:,:], phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts, "phi_dot", [train_args["algo"], "leading_order", "ground_truth"])
 
 write_logs([prev_ts, curr_ts], train_args)
-print("utility loss for FBSDE: {}".format(loss_eval_fbsde))
+print(f"utility loss for {train_args['algo']}: {loss_eval_algo}")

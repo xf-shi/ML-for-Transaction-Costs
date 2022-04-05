@@ -546,7 +546,7 @@ Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_deep_hedging[0,:,:], phi_dot_stm
 write_logs([prev_ts, curr_ts], train_args)
 """
 
-
+#curr_ts = "test"
 model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
 phi_dot_stm_algo, phi_stm_algo, loss_eval_algo = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0)
 phi_dot_stm_leading_order, phi_stm_leading_order, loss_eval_leading_order = evaluation(dW_STD, curr_ts, None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0)
@@ -556,6 +556,9 @@ phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_eval_ground_truth = evaluat
 #Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_algo[0,:,0], phi_dot_stm_ground_truth[0,:,0]], curr_ts, "phi_dot", [train_args["algo"], "ground_truth"])
 Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_algo[0,1:,:], phi_stm_leading_order[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts, "phi", [train_args["algo"], "leading_order", "ground_truth"])
 Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_algo[0,:,:], phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts, "phi_dot", [train_args["algo"], "leading_order", "ground_truth"])
+
+#Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_leading_order[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts, "phi", ["leading_order", "ground_truth"])
+#Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts, "phi_dot", ["leading_order", "ground_truth"])
 
 write_logs([prev_ts, curr_ts], train_args)
 print(f"utility loss for {train_args['algo']}: {loss_eval_algo}")

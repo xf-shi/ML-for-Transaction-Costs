@@ -20,7 +20,7 @@ T = 100 #
 TR = 1 #???
 N_SAMPLE = 128
 N_STOCK = 3
-COEF_ = 1e10
+COEF_ = 1e11
 S_OUTSTANDING = torch.tensor([1.15, 0.32, 0.23]) *1e10 / COEF_
 GAMMA = 1/(1/ (8.91*1e-13) + 1/ (4.45 * 1e-12) ) * COEF_
 BM_COV = torch.eye(3) #[[1, 0.5], [0.5, 1]]
@@ -293,7 +293,7 @@ class DynamicsFactory():
         phi_stm[:,0,:] = S_OUTSTANDING / 2
         phi_dot_stm = torch.zeros((N_SAMPLE, T, N_STOCK)).to(device = DEVICE)
         for t in range(T):
-            phi_dot_stm[:,t,:] = -(phi_stm[:,t,:] - self.phi_stm_bar[:,t,:]) @ self.const_mm
+            phi_dot_stm[:,t,:] = -(phi_stm[:,t,:] - self.phi_stm_bar[:,t,:]) @ self.lam_mm_negHalf @ self.const_mm @ self.lam_mm_half
             phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] * TR / T
         return phi_dot_stm, phi_stm
     
@@ -307,11 +307,12 @@ class DynamicsFactory():
         phi_stm[:,0,:] = S_OUTSTANDING / 2
         phi_dot_stm = torch.zeros((N_SAMPLE, T, N_STOCK)).to(device = DEVICE)
         for t in range(T):
-            tanh_inner = 2 * self.const_mm * (T - t) / T * TR
+            tanh_inner = self.const_mm * (T - t - 1) / T * TR
             evals, evecs = torch.eig(tanh_inner, eigenvectors = True)
             tanh_exp = torch.matmul(evecs, torch.matmul(torch.diag(torch.exp(evals[:,0])), torch.inverse(evecs)))
-            tanh_tmp = 1 - 2 * torch.inverse(tanh_exp + 1)
-            phi_dot_stm[:,t,:] = -(phi_stm[:,t,:] - self.phi_stm_bar[:,t,:]) @ self.const_mm @ tanh_tmp #torch.tanh(self.const_mm * (T - t) / T * TR).T
+            tanh_exp_neg = torch.matmul(evecs, torch.matmul(torch.diag(torch.exp(-evals[:,0])), torch.inverse(evecs)))
+            tanh_tmp = torch.inverse(tanh_exp_neg + tanh_exp) @ (tanh_exp - tanh_exp_neg) #1 - 2 * torch.inverse(tanh_exp + 1)
+            phi_dot_stm[:,t,:] = -(phi_stm[:,t,:] - self.phi_stm_bar[:,t,:]) @ self.lam_mm_negHalf @ self.const_mm @ self.lam_mm_half @ tanh_tmp #torch.tanh(self.const_mm * (T - t) / T * TR).T
             phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] * TR / T
         return phi_dot_stm, phi_stm
     
@@ -558,3 +559,5 @@ Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_algo[0,:,:], phi_dot_stm_leading
 
 write_logs([prev_ts, curr_ts], train_args)
 print(f"utility loss for {train_args['algo']}: {loss_eval_algo}")
+print(f"leading order loss: {loss_eval_leading_order}")
+print(f"ground truth loss: {loss_eval_ground_truth}")

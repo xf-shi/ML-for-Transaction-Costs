@@ -17,7 +17,7 @@ import sys
 
 ## TODO: Adjust these global constants:
 T = 100 #
-TR = 10 #???
+TR = 1 #???
 N_SAMPLE = 128
 N_STOCK = 3
 COEF_ = 1e10

@@ -1,2 +1,4 @@
 None	2022-04-05-19-03-34	{"algo": "deep_hedging", "cost": "quadratic", "model_name": "discretized_feedforward", "solver": "Adam", "hidden_lst": [50], "lr": 0.01, "epoch": 100, "decay": 0.1, "scheduler_step": 1000, "retrain": true}
 None	2022-04-05-19-50-41	{"algo": "deep_hedging", "cost": "quadratic", "model_name": "discretized_feedforward", "solver": "Adam", "hidden_lst": [50], "lr": 0.01, "epoch": 100, "decay": 0.1, "scheduler_step": 1000, "retrain": true}
+None	2022-04-05-19-58-37	{"algo": "deep_hedging", "cost": "quadratic", "model_name": "discretized_feedforward", "solver": "Adam", "hidden_lst": [50], "lr": 0.01, "epoch": 100, "decay": 0.1, "scheduler_step": 1000, "retrain": true}
+None	2022-04-05-20-00-09	{"algo": "deep_hedging", "cost": "quadratic", "model_name": "discretized_feedforward", "solver": "Adam", "hidden_lst": [50], "lr": 0.01, "epoch": 100, "decay": 0.1, "scheduler_step": 1000, "retrain": true}

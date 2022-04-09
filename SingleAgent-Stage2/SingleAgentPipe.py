@@ -309,8 +309,9 @@ class DynamicsFactory():
         for t in range(T):
             tanh_inner = self.const_mm / T * (T - t - 1) * TR
             evals, evecs = torch.eig(tanh_inner, eigenvectors = True)
-            tanh_exp = torch.matmul(evecs, torch.matmul(torch.diag(torch.exp(evals[:,0])), torch.inverse(evecs)))
-            tanh_exp_neg = torch.matmul(evecs, torch.matmul(torch.diag(torch.exp(-evals[:,0])), torch.inverse(evecs)))
+            norm_fac = torch.sum(evals[:,0] ** 2) ** 0.5 + 1e-9
+            tanh_exp = torch.matmul(evecs, torch.matmul(torch.diag(torch.exp(evals[:,0] / norm_fac)), torch.inverse(evecs)))
+            tanh_exp_neg = torch.matmul(evecs, torch.matmul(torch.diag(torch.exp(evals[:,0] / norm_fac * (1 - 2 * norm_fac))), torch.inverse(evecs)))
             tanh_tmp = torch.inverse(tanh_exp_neg + tanh_exp) @ (tanh_exp - tanh_exp_neg) #1 - 2 * torch.inverse(tanh_exp + 1)
             phi_dot_stm[:,t,:] = -(phi_stm[:,t,:] - self.phi_stm_bar[:,t,:]) @ self.lam_mm_negHalf @ self.const_mm @ self.lam_mm_half @ tanh_tmp #torch.tanh(self.const_mm * (T - t) / T * TR).T
             phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] / T * TR

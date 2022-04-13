@@ -16,8 +16,8 @@ from tqdm import tqdm
 import sys
 
 ## TODO: Adjust these global constants:
-T = 100 #
-TR = 1 #???
+T = 252 #
+TR = 84 #???
 N_SAMPLE = 128
 N_STOCK = 3
 COEF_ = 1e11
@@ -42,7 +42,7 @@ def get_constants(dW_std):
     sigma_stmd = torch.ones((N_SAMPLE, T, N_STOCK, N_BM)) * sigma_md
     s_tm = torch.ones((T, N_STOCK))
     xi_dd = torch.tensor([[ -2.07, 1.91, 0.64],[1.91, -1.77, -0.59],[0.64 ,-0.59 ,-0.20]]) *1e9 / COEF_
-    lam_mm = torch.diag(torch.tensor([0.1269, 0.3354, 0.8595])) * 1e-8 * COEF_ #torch.ones((N_STOCK, N_STOCK))
+    lam_mm = torch.diag(torch.tensor([0.1269, 0.3354, 0.8595])) * 1e-8 * COEF_ * 0.01 #torch.ones((N_STOCK, N_STOCK))
     alpha_md = sigma_md.clone() #torch.ones((N_STOCK, N_BM)) #???
     beta_m = torch.ones(N_STOCK) #???
 
@@ -324,7 +324,7 @@ class DynamicsFactory():
         phi_dot_stm = torch.zeros((N_SAMPLE, T, N_STOCK)).to(device = DEVICE)
         curr_t = torch.ones((N_SAMPLE, 1))
         for t in range(T):
-            x = torch.cat((phi_stm[:,t,:], curr_t), dim = 1).to(device = DEVICE)
+            x = torch.cat((phi_stm[:,t,:], self.W_std[:,t,:], curr_t), dim = 1).to(device = DEVICE)
             phi_dot_stm[:,t,:] = model((t, x))
 #            phi_dot_stm[:,t,-1] = -torch.sum(phi_dot_stm[:,t,:-1])
             phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] / T * TR
@@ -342,7 +342,7 @@ class LossFactory():
     ## TODO: Implement it -- Zhanhao Zhang
     def utility_loss(self, phi_dot_stm, phi_stm, power):
         loss_mat = torch.einsum("ijk, ijk -> ij", phi_stm[:,1:,:], self.mu_stm) - GAMMA / 2 * torch.einsum("ijk -> ij", (torch.einsum("ijk, ijkl -> ijl", phi_stm[:,1:,:], self.sigma_stmd) + torch.einsum("ijk, kl -> ijl", self.W_std[:,1:,:], self.xi_dd)) ** 2) - 1 / 2 * torch.einsum("ijk, lk, ijl -> ij", phi_dot_stm, self.lam_mm, phi_dot_stm)
-        loss_compact = -torch.sum(loss_mat / N_SAMPLE / T * TR)
+        loss_compact = -torch.sum(loss_mat / N_SAMPLE / T * TR) / TR
         return loss_compact
     
     ## TODO: Implement it -- Zhanhao Zhang
@@ -443,7 +443,7 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         output_dim = N_STOCK
     else:
         output_dim = N_BM * N_STOCK
-    model_factory = ModelFactory(algo, model_name, N_BM + 1, hidden_lst, output_dim, lr, decay, scheduler_step, solver, retrain)
+    model_factory = ModelFactory(algo, model_name, N_BM + N_STOCK + 1, hidden_lst, output_dim, lr, decay, scheduler_step, solver, retrain)
 
     model, optimizer, scheduler, prev_ts = model_factory.prepare_model()
     loss_arr = []
@@ -528,11 +528,11 @@ train_args = {
     "model_name": "discretized_feedforward",
     "solver": "Adam",
     "hidden_lst": [50],
-    "lr": 1e-2,
-    "epoch": 100,
+    "lr": 1e-4,
+    "epoch": 10000,
     "decay": 0.1,
-    "scheduler_step": 1000,
-    "retrain": True,
+    "scheduler_step": 100000,
+    "retrain": False,
 }
 
 """

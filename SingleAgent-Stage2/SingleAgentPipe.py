@@ -1,3 +1,5 @@
+drive_dir = "." #"drive/MyDrive/SingleAgent-Stage2"
+
 import os
 import math
 import json
@@ -34,7 +36,7 @@ N_BM = BM_COV.shape[0]
 ## TODO: Adjust this function to get constant processes
 ## Compute constants processes using dW
 def get_constants(dW_std):
-    W_std = torch.cumsum(torch.cat((torch.zeros((N_SAMPLE, 1, N_BM)), dW_std), dim=1), dim=1)
+    W_std = torch.cumsum(torch.cat((torch.zeros((N_SAMPLE, 1, N_BM)), dW_std.cpu()), dim=1), dim=1)
     
     mu_stm = torch.ones((N_SAMPLE, T, N_STOCK)) * torch.tensor([[2.99, 3.71, 3.55]]) #torch.tensor([[2.99, 3.71, 3.55]]).repeat(T,1)
     sigma_big = torch.tensor([[72.00, 71.49, 54.80],[71.49, 85.42, 65.86],[54.80, 65.86, 56.84]])
@@ -200,17 +202,18 @@ class ModelFactory:
         if curr_ts is None:
             curr_ts = datetime.now(tz=pytz.timezone("America/New_York")).strftime("%Y-%m-%d-%H-%M-%S")
         model_save = self.model.cpu()
-        torch.save(model_save, f"Models/{self.algo}_{self.model_name}__{curr_ts}.pt")
+        torch.save(model_save, f"{drive_dir}/Models/{self.algo}_{self.model_name}__{curr_ts}.pt")
+        self.model = self.model.to(device=DEVICE)
         return curr_ts
     
     def load_latest(self):
-        ts_lst = [f.strip(".pt").split("__")[1] for f in os.listdir("Models/") if f.endswith(".pt") and f.startswith(self.algo+"_"+self.model_name)] #f.startswith(self.model_name)
+        ts_lst = [f.strip(".pt").split("__")[1] for f in os.listdir(f"{drive_dir}/Models/") if f.endswith(".pt") and f.startswith(self.algo+"_"+self.model_name)] #f.startswith(self.model_name)
         ts_lst = sorted(ts_lst, reverse=True)
         if len(ts_lst) == 0:
             return None, None
         ts = ts_lst[0]
 
-        model = torch.load(f"Models/{self.algo}_{self.model_name}__{ts}.pt")
+        model = torch.load(f"{drive_dir}/Models/{self.algo}_{self.model_name}__{ts}.pt")
         model = model.to(device = DEVICE)
         return model, ts
 
@@ -226,7 +229,7 @@ class DynamicsFactory():
         self.alpha_mm_sq = self.alpha_md @ self.alpha_md.T
         self.const_mm = (GAMMA ** (1/2)) * self.mat_frac_pow(self.lam_mm_negHalf @ self.alpha_mm_sq @ self.lam_mm_negHalf, 1/2) #(GAMMA ** (1/2)) * self.lam_mm_negHalf @ self.mat_frac_pow(self.lam_mm_negHalf @ self.alpha_mm_sq @ self.lam_mm_negHalf, 1/2) @ self.lam_mm_half
         self.sigma_stmm_sq = torch.einsum("sijk, silk -> sijl", self.sigma_stmd, self.sigma_stmd)
-        self.sigma_stmm_sq_inv = torch.zeros((N_SAMPLE, T, N_STOCK, N_STOCK))
+        self.sigma_stmm_sq_inv = torch.zeros((N_SAMPLE, T, N_STOCK, N_STOCK)).to(device = DEVICE)
         for s in range(N_SAMPLE):
             for t in range(T):
                 self.sigma_stmm_sq_inv[s,t,:,:] = torch.inverse(self.sigma_stmm_sq[s,t,:,:]) #self.sigma_stmm_sq_inv[t,:,:] #
@@ -282,7 +285,6 @@ class DynamicsFactory():
                 -TR / T * torch.mm(torch.mm(torch.mm(torch.inverse(self.lam_mm), self.sigma_tmd[t, :, :]), self.sigma_tmd[t, :, :].T),S_OUTSTANDING_M1 )[:,0] + \
                 +torch.einsum( 'bik, bk -> bi' , Z_stmd[:, t, :, :],self.dW_std[:,t,:])
             # ??? N
-
             stock_stm[:, t+1 , :] = stock_stm[:, t , :] +\
                 +TR / T * GAMMA * torch.mm(torch.mm( self.sigma_tmd[t, :, :], self.sigma_tmd[t, :, :].T),S_OUTSTANDING_M1 )[:,0] +\
                 + torch.einsum( 'ij, bj -> bi' , self.sigma_tmd[t, :, :],self.dW_std[:,t,:])"""
@@ -330,9 +332,9 @@ class DynamicsFactory():
         else:
             phi_stm[:,0,:] = phi_0
         phi_dot_stm = torch.zeros((N_SAMPLE, time_len, N_STOCK)).to(device = DEVICE)
-        curr_t = torch.ones((N_SAMPLE, 1))
+        curr_t = torch.ones((N_SAMPLE, 1)).to(device = DEVICE)
         for t in range(time_len):
-            x = torch.cat((phi_stm[:,t,:], self.W_std[:,t + start_t,:], curr_t), dim = 1).to(device = DEVICE)
+            x = torch.cat((phi_stm[:,t,:], self.W_std[:,t + start_t,:], curr_t), dim = 1)#.to(device = DEVICE)
             phi_dot_stm[:,t,:] = model((t, x))
 #            phi_dot_stm[:,t,-1] = -torch.sum(phi_dot_stm[:,t,:-1])
             phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] / T * TR
@@ -375,7 +377,7 @@ class LossFactory():
 
 ## Write training logs to file
 def write_logs(ts_lst, train_args):
-    with open("Logs.tsv", "a") as f:
+    with open(f"{drive_dir}/Logs.tsv", "a") as f:
         for i in range(1, len(ts_lst)):
             line = f"{ts_lst[i - 1]}\t{ts_lst[i]}\t{json.dumps(train_args)}\n"
             f.write(line)
@@ -386,7 +388,7 @@ def visualize_loss(loss_arr, ts, loss_truth):
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.title(f"Final Loss = {round(loss_arr[-1], 2)}, True Loss = {round(loss_truth, 2)}")
-    plt.savefig(f"Plots/loss_{ts}.png")
+    plt.savefig(f"{drive_dir}/Plots/loss_{ts}.png")
     plt.close()
 
 ## Visualize dynamics of an arbitrary component
@@ -414,7 +416,7 @@ def Visualize_dyn(timestamps, arr, ts, name):
     plt.ylabel(title)
     plt.title(title)
     plt.legend()
-    plt.savefig(f"Plots/{name}_{ts}.png")
+    plt.savefig(f"{drive_dir}/Plots/{name}_{ts}.png")
     plt.close()
 
 ## Visualize the comparision of dynamics from different algorithms
@@ -443,7 +445,7 @@ def Visualize_dyn_comp(timestamps, arr_lst, ts, name, algo_lst):
     plt.ylabel(title)
     plt.title(title)
     plt.legend()
-    plt.savefig(f"Plots/comp_{name}_{ts}.png")
+    plt.savefig(f"{drive_dir}/Plots/comp_{name}_{ts}.png")
     plt.close()
 
 ## The training pipeline
@@ -559,24 +561,12 @@ train_args = {
     "solver": "Adam",
     "hidden_lst": [50],
     "lr": 1e-3,
-    "epoch": 1000,
+    "epoch": 2,
     "decay": 0.1,
     "scheduler_step": 100000,
     "retrain": False,
     "pasting_cutoff": 120
 }
-
-"""
-model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
-phi_dot_stm_deep_hedging, phi_stm_deep_hedging, loss_eval_deep_hedging = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0)
-phi_dot_stm_leading_order, phi_stm_leading_order, loss_eval_leading_order = evaluation(dW_STD, curr_ts, None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0)
-phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_eval_ground_truth = evaluation(dW_STD, curr_ts, None, algo = "ground_truth", cost = train_args["cost"], visualize_obs = 0)
-#Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_deep_hedging[0,1:,:], phi_stm_leading_order[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts, "phi", ["deep_hedging", "leading_order", "ground_truth"])
-#Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_deep_hedging[0,:,:], phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts, "phi_dot", ["deep_hedging", "leading_order", "ground_truth"])
-Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_deep_hedging[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts, "phi", ["deep_hedging", "ground_truth"])
-Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_deep_hedging[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts, "phi_dot", ["deep_hedging", "ground_truth"])
-write_logs([prev_ts, curr_ts], train_args)
-"""
 
 #curr_ts = "test"
 model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)

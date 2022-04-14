@@ -293,11 +293,11 @@ class DynamicsFactory():
         pass
     
     ## TODO: Implement it -- Zhanhao Zhang
-    def leading_order_quad(self, model = None, T = T):
-        phi_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device = DEVICE)
+    def leading_order_quad(self, model = None, time_len = T):
+        phi_stm = torch.zeros((N_SAMPLE, time_len + 1, N_STOCK)).to(device = DEVICE)
         phi_stm[:,0,:] = S_OUTSTANDING / 2
-        phi_dot_stm = torch.zeros((N_SAMPLE, T, N_STOCK)).to(device = DEVICE)
-        for t in range(T):
+        phi_dot_stm = torch.zeros((N_SAMPLE, time_len, N_STOCK)).to(device = DEVICE)
+        for t in range(time_len):
             phi_dot_stm[:,t,:] = -(phi_stm[:,t,:] - self.phi_stm_bar[:,t,:]) @ self.lam_mm_negHalf @ self.const_mm @ self.lam_mm_half
             phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] / T * TR
         return phi_dot_stm, phi_stm
@@ -323,15 +323,15 @@ class DynamicsFactory():
         return phi_dot_stm, phi_stm
     
     ## TODO: Implement it -- Zhanhao Zhang
-    def deep_hedging(self, model, T = T, phi_0 = None, start_t = 0):
-        phi_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device = DEVICE)
+    def deep_hedging(self, model, time_len = T, phi_0 = None, start_t = 0):
+        phi_stm = torch.zeros((N_SAMPLE, time_len + 1, N_STOCK)).to(device = DEVICE)
         if phi_0 is None:
             phi_stm[:,0,:] = S_OUTSTANDING / 2
         else:
             phi_stm[:,0,:] = phi_0
-        phi_dot_stm = torch.zeros((N_SAMPLE, T, N_STOCK)).to(device = DEVICE)
+        phi_dot_stm = torch.zeros((N_SAMPLE, time_len, N_STOCK)).to(device = DEVICE)
         curr_t = torch.ones((N_SAMPLE, 1))
-        for t in range(T):
+        for t in range(time_len):
             x = torch.cat((phi_stm[:,t,:], self.W_std[:,t + start_t,:], curr_t), dim = 1).to(device = DEVICE)
             phi_dot_stm[:,t,:] = model((t, x))
 #            phi_dot_stm[:,t,-1] = -torch.sum(phi_dot_stm[:,t,:-1])
@@ -343,8 +343,8 @@ class DynamicsFactory():
         phi_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device = DEVICE)
         phi_stm[:,0,:] = S_OUTSTANDING / 2
         phi_dot_stm = torch.zeros((N_SAMPLE, T, N_STOCK)).to(device = DEVICE)
-        phi_dot_stm_leading_order, phi_stm_leading_order = self.leading_order_quad(T = M)
-        phi_dot_stm_deep_hedging, phi_stm_deep_hedging = self.deep_hedging(model, T = T - M, phi_0 = phi_stm_leading_order[:,-1,:].data, start_t = M)
+        phi_dot_stm_leading_order, phi_stm_leading_order = self.leading_order_quad(time_len = M)
+        phi_dot_stm_deep_hedging, phi_stm_deep_hedging = self.deep_hedging(model, time_len = T - M, phi_0 = phi_stm_leading_order[:,-1,:].data, start_t = M)
         phi_dot_stm[:,:M,:] += phi_dot_stm_leading_order
         phi_stm[:,:(M+1),:] += phi_stm_leading_order
         phi_dot_stm[:,M:,:] += phi_dot_stm_deep_hedging

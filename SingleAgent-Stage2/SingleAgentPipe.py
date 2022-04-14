@@ -129,10 +129,10 @@ class ModelFull(nn.Module):
 
 ## Construct arbitrary neural network models with optimizer and scheduler
 class ModelFactory:
-    def __init__(self, algo, model_name, input_dim, hidden_lst, output_dim, lr, decay, scheduler_step, solver = "Adam", retrain = False):
+    def __init__(self, algo, model_name, input_dim, hidden_lst, output_dim, lr, decay, scheduler_step, solver = "Adam", retrain = False, pasting_cutoff = 0):
         assert solver in ["Adam", "SGD", "RMSprop"]
         assert model_name in ["discretized_feedforward", "rnn"]
-        assert algo in ["deep_hedging", "fbsde"]
+        assert algo in ["deep_hedging", "fbsde", "pasting"]
         self.lr = lr
         self.decay = decay
         self.scheduler_step = scheduler_step
@@ -144,6 +144,7 @@ class ModelFactory:
         self.model = None
         self.prev_ts = None
         self.algo = algo
+        self.pasting_cutoff = pasting_cutoff
 
         if not retrain:
             self.model, self.prev_ts = self.load_latest()
@@ -168,8 +169,12 @@ class ModelFactory:
 
     ## TODO: Implement it -- Zhanhao Zhang
     def discretized_feedforward(self):
+        if self.algo == "pasting":
+            time_len = T - self.pasting_cutoff
+        else:
+            time_len = T
         model_list = nn.ModuleList()
-        for _ in range(len(TIMESTAMPS) - 1):
+        for _ in range(time_len):
             model = Net(self.input_dim, self.hidden_lst, self.output_dim)
             model_list.append(model)
         return model_list
@@ -288,7 +293,7 @@ class DynamicsFactory():
         pass
     
     ## TODO: Implement it -- Zhanhao Zhang
-    def leading_order_quad(self, model = None):
+    def leading_order_quad(self, model = None, T = T):
         phi_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device = DEVICE)
         phi_stm[:,0,:] = S_OUTSTANDING / 2
         phi_dot_stm = torch.zeros((N_SAMPLE, T, N_STOCK)).to(device = DEVICE)
@@ -318,16 +323,32 @@ class DynamicsFactory():
         return phi_dot_stm, phi_stm
     
     ## TODO: Implement it -- Zhanhao Zhang
-    def deep_hedging(self, model):
+    def deep_hedging(self, model, T = T, phi_0 = None, start_t = 0):
         phi_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device = DEVICE)
-        phi_stm[:,0,:] = S_OUTSTANDING / 2
+        if phi_0 is None:
+            phi_stm[:,0,:] = S_OUTSTANDING / 2
+        else:
+            phi_stm[:,0,:] = phi_0
         phi_dot_stm = torch.zeros((N_SAMPLE, T, N_STOCK)).to(device = DEVICE)
         curr_t = torch.ones((N_SAMPLE, 1))
         for t in range(T):
-            x = torch.cat((phi_stm[:,t,:], self.W_std[:,t,:], curr_t), dim = 1).to(device = DEVICE)
+            x = torch.cat((phi_stm[:,t,:], self.W_std[:,t + start_t,:], curr_t), dim = 1).to(device = DEVICE)
             phi_dot_stm[:,t,:] = model((t, x))
 #            phi_dot_stm[:,t,-1] = -torch.sum(phi_dot_stm[:,t,:-1])
             phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] / T * TR
+        return phi_dot_stm, phi_stm
+    
+    ## TODO: Implement it -- Zhanhao Zhang
+    def pasting(self, model, M):
+        phi_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device = DEVICE)
+        phi_stm[:,0,:] = S_OUTSTANDING / 2
+        phi_dot_stm = torch.zeros((N_SAMPLE, T, N_STOCK)).to(device = DEVICE)
+        phi_dot_stm_leading_order, phi_stm_leading_order = self.leading_order_quad(T = M)
+        phi_dot_stm_deep_hedging, phi_stm_deep_hedging = self.deep_hedging(model, T = T - M, phi_0 = phi_stm_leading_order[:,-1,:].data, start_t = M)
+        phi_dot_stm[:,:M,:] += phi_dot_stm_leading_order
+        phi_stm[:,:(M+1),:] += phi_stm_leading_order
+        phi_dot_stm[:,M:,:] += phi_dot_stm_deep_hedging
+        phi_stm[:,(M+1):,:] += phi_stm_deep_hedging[:,1:,:]
         return phi_dot_stm, phi_stm
 
 ## TODO: Implement it
@@ -426,9 +447,8 @@ def Visualize_dyn_comp(timestamps, arr_lst, ts, name, algo_lst):
     plt.close()
 
 ## The training pipeline
-def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "discretized_feedforward", solver = "Adam",
-                      hidden_lst = [50], lr = 1e-2, epoch = 1000, decay = 0.1, scheduler_step = 10000, retrain = False):
-    assert algo in ["deep_hedging", "fbsde"]
+def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "discretized_feedforward", solver = "Adam", hidden_lst = [50], lr = 1e-2, epoch = 1000, decay = 0.1, scheduler_step = 10000, retrain = False, pasting_cutoff = 0):
+    assert algo in ["deep_hedging", "fbsde", "pasting"]
     assert cost in ["quadratic", "power"]
     assert model_name in ["discretized_feedforward", "rnn"]
     assert solver in ["Adam", "SGD", "RMSprop"]
@@ -441,9 +461,14 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
     ## TODO: Change the input dimension accordingly
     if algo == "deep_hedging":
         output_dim = N_STOCK
-    else:
+        input_dim = N_BM + N_STOCK + 1
+    elif algo == "fbsde":
         output_dim = N_BM * N_STOCK
-    model_factory = ModelFactory(algo, model_name, N_BM + N_STOCK + 1, hidden_lst, output_dim, lr, decay, scheduler_step, solver, retrain)
+        input_dim = N_STOCK + 1
+    else:
+        output_dim = N_STOCK
+        input_dim = N_BM + N_STOCK + 1
+    model_factory = ModelFactory(algo, model_name, input_dim, hidden_lst, output_dim, lr, decay, scheduler_step, solver, retrain, pasting_cutoff)
 
     model, optimizer, scheduler, prev_ts = model_factory.prepare_model()
     loss_arr = []
@@ -458,12 +483,15 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         if algo == "deep_hedging":
             phi_dot_stm, phi_stm = dynamic_factory.deep_hedging(model)
             loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power)
-        else:
+        elif algo == "fbsde":
             if cost == "quadratic":
                 phi_dot_stm, phi_stm = dynamic_factory.fbsde_quad(model)
             else:
                 phi_dot_stm, phi_stm = dynamic_factory.fbsde_power(model)
             loss = loss_factory.fbsde_loss(phi_dot_stm, phi_stm)
+        else: #if algo == "pasting":
+            phi_dot_stm, phi_stm = dynamic_factory.pasting(model, pasting_cutoff)
+            loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power)
         ## End here ##
         loss_arr.append(float(loss.data))
         loss.backward()
@@ -485,8 +513,8 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
     visualize_loss(loss_arr, curr_ts, loss_truth)
     return model, loss_arr, prev_ts, curr_ts
 
-def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "quadratic", visualize_obs = 0):
-    assert algo in ["deep_hedging", "fbsde", "leading_order", "ground_truth"]
+def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "quadratic", visualize_obs = 0, pasting_cutoff = 0):
+    assert algo in ["deep_hedging", "fbsde", "pasting", "leading_order", "ground_truth"]
     assert cost in ["quadratic", "power"]
     if cost == "quadratic":
         power = 2
@@ -503,6 +531,8 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
             phi_dot_stm, phi_stm = dynamic_factory.fbsde_power(model)
         ### to match the dim
         phi_dot_stm = phi_dot_stm[:,:-1,:]
+    elif algo == "pasting":
+        phi_dot_stm, phi_stm = dynamic_factory.pasting(model, pasting_cutoff)
     elif algo == "leading_order":
         if cost == "quadratic":
             phi_dot_stm, phi_stm = dynamic_factory.leading_order_quad(model)
@@ -523,16 +553,17 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
         
 ## TODO: Adjust the arguments for training
 train_args = {
-    "algo": "deep_hedging",
+    "algo": "pasting",
     "cost": "quadratic",
     "model_name": "discretized_feedforward",
     "solver": "Adam",
     "hidden_lst": [50],
-    "lr": 1e-4,
-    "epoch": 10000,
+    "lr": 1e-3,
+    "epoch": 1000,
     "decay": 0.1,
     "scheduler_step": 100000,
     "retrain": False,
+    "pasting_cutoff": 120
 }
 
 """
@@ -549,7 +580,7 @@ write_logs([prev_ts, curr_ts], train_args)
 
 #curr_ts = "test"
 model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
-phi_dot_stm_algo, phi_stm_algo, loss_eval_algo = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0)
+phi_dot_stm_algo, phi_stm_algo, loss_eval_algo = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0, pasting_cutoff = train_args["pasting_cutoff"])
 phi_dot_stm_leading_order, phi_stm_leading_order, loss_eval_leading_order = evaluation(dW_STD, curr_ts, None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0)
 phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_eval_ground_truth = evaluation(dW_STD, curr_ts, None, algo = "ground_truth", cost = train_args["cost"], visualize_obs = 0)
 

@@ -127,8 +127,8 @@ The core dynamic is defined in the function `pasting`, and the key variables in 
 | Variable | Meaning |
 | --- | ---  |
 | `M`  | cut-off value for the trading horizon considered as long enough for the leading-order solution   |
-| `phi_stm` | collection of the frictional positions throughout the trading horizon: taking the value of the leading-order solution from time 0 to M, and the value of the Deep Hedging from time M to the end of trading horizon, TR |
-| `phi_dot_stm` | collection of the frictional trading rate throughout the trading horizon, taking the value of the leading-order solution from time 0 to M, and the value of the Deep Hedging from time M to the end of trading horizon, TR|
+| `phi_stm` | collection of the frictional positions throughout the trading horizon: taking the value of the leading-order solution from time 0 to M, and the value of the Deep Hedging from time M to the end of trading horizon, T |
+| `phi_dot_stm` | collection of the frictional trading rate throughout the trading horizon, taking the value of the leading-order solution from time 0 to M, and the value of the Deep Hedging from time M to the end of trading horizon, T|
 | `phi_stm_leading_order` | collection of the frictional positions from the initial time to time M, given by the leading-order solution|
 | `phi_dot_stm_leading_order` | collection of the frictional trading rate from the initial time to time M, given by the leading-order solution|
 | `phi_stm_deep_hedging` | collection of the frictional positions from time M to the end of trading horizon, given by the deep hedging|

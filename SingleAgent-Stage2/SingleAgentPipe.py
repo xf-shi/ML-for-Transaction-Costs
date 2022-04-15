@@ -529,6 +529,9 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
     
     ## Visualize loss and results
     visualize_loss(loss_arr, curr_ts, loss_truth)
+    if algo == "pasting":
+        Visualize_dyn_comp(time_lst[1:], [phi_stm[0,1:,:], phi_stm_leading_order[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts + "_training", "phi", [train_args["algo"], "leading_order", "ground_truth"])
+        Visualize_dyn_comp(time_lst[1:], [phi_dot_stm[0,:,:], phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts + "_training", "phi_dot", [train_args["algo"], "leading_order", "ground_truth"])
     return model, loss_arr, prev_ts, curr_ts
 
 def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "quadratic", visualize_obs = 0, pasting_cutoff = 0):

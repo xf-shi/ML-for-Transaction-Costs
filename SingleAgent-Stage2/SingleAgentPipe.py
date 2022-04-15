@@ -459,7 +459,7 @@ def Visualize_dyn_comp(timestamps, arr_lst, ts, name, algo_lst):
     plt.close()
 
 ## The training pipeline
-def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "discretized_feedforward", solver = "Adam", hidden_lst = [50], lr = 1e-2, epoch = 1000, decay = 0.1, scheduler_step = 10000, retrain = False, pasting_cutoff = 0):
+def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "discretized_feedforward", solver = "Adam", hidden_lst = [50], lr = 1e-2, epoch = 1000, decay = 0.1, scheduler_step = 10000, retrain = False, pasting_cutoff = 0, **kargs):
     assert algo in ["deep_hedging", "fbsde", "pasting"]
     assert cost in ["quadratic", "power"]
     assert model_name in ["discretized_feedforward", "rnn"]
@@ -585,7 +585,8 @@ train_args = {
     "decay": 0.1,
     "scheduler_step": 100000,
     "retrain": False,
-    "pasting_cutoff": 4800
+    "pasting_cutoff": 4800,
+    "n_sample": N_SAMPLE
 }
 
 #curr_ts = "test"

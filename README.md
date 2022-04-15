@@ -140,7 +140,7 @@ The core dynamic is defined in the function `pasting`, and the key variables in 
 
 
 
-## Example
+## Example  
 Here we proivde an example for the quadratic cost case (`q=2`) with the trading horizon of 21 days (`TIME=21`).    
 <br/>
 The trading horizon is discretized in 168 time steps (`TIME_STEP=168`). The parameters are taken from the calibration in [1]:

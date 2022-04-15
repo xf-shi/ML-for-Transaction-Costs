@@ -1,1 +1,1 @@
-None	2022-04-14-14-38-12	{"algo": "pasting", "cost": "quadratic", "model_name": "discretized_feedforward", "solver": "Adam", "hidden_lst": [50], "lr": 0.001, "epoch": 1000, "decay": 0.1, "scheduler_step": 100000, "retrain": false, "pasting_cutoff": 120}
+None	2022-04-15-10-45-19	{"algo": "pasting", "cost": "quadratic", "model_name": "discretized_feedforward", "solver": "Adam", "hidden_lst": [50], "lr": 0.001, "epoch": 100, "decay": 0.1, "scheduler_step": 100000, "retrain": false, "pasting_cutoff": 4800}

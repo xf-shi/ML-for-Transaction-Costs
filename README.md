@@ -81,7 +81,6 @@ For the detailed implementation of the FBSDE solver, see the class `DynamicsFact
 The core dynamic is defined in the function `fbsde_quad`, and the key variables in the code are summarized below:   
 | Variable | Meaning |
 | --- | --- |
-| `const_mm`  |  <img src="https://latex.codecogs.com/gif.latex?\gamma^{1/2}{(\Lambda^{-1/2} \alpha \alpha^T \Lambda^{-1/2})}^{1/2}" /> |
 | `dW_std`  | iid normally distributed random variables with mean zero and variance <img src="https://latex.codecogs.com/gif.latex?\Delta%20t" />, <img src="https://latex.codecogs.com/gif.latex?\Delta%20W_t" /> |
 | `W_std` | 3-dimsion Brownian motion at time t, <img src="https://latex.codecogs.com/gif.latex?W_t" />  |
 | `xi_std_w` | collection of the endowment volatility, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\xi_t\}" /> |
@@ -113,7 +112,6 @@ For the detailed implementation of the Deep Hedging, see the class `DynamicsFact
 The core dynamic is defined in the function `deep_hedging`, and the key variables in the code are summarized below:   
 | Variable | Meaning |
 | --- | ---  |
-| `const_mm`  |  <img src="https://latex.codecogs.com/gif.latex?\gamma^{1/2}{(\Lambda^{-1/2} \alpha \alpha^T \Lambda^{-1/2})}^{1/2}" /> |
 | `dW_std`  | iid normally distributed random variables with mean zero and variance <img src="https://latex.codecogs.com/gif.latex?\Delta%20t" />, <img src="https://latex.codecogs.com/gif.latex?\Delta%20W_t" /> |
 | `W_std` | 3-dimsion Brownian motion at time t, <img src="https://latex.codecogs.com/gif.latex?W_t" />  |
 | `xi_std_w` | collection of the endowment volatility, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\xi_t\}" /> |

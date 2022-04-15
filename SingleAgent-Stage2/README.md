@@ -12,7 +12,7 @@ This script solves the optimal hedging strategies of a single agent under high-d
 | epoch | The number of training epochs | A positive integer. E.g. 10000 |
 | decay | The decay rate of the learning rate at each step of the scheduler | A positive real number. E.g. 0.1 |
 | scheduler_step | The number of epochs for each step in the scheduler | A positive integer. E.g. 5000 |
-| retrain | Whether to retrain a new model or reuse the latest pre-trained one | - |
+| retrain | Whether to retrain a new model or reuse the latest pre-trained one | True: Ignore the old models and train a new model.<br>False: Continue training on the latest pre-trained model of the same algorithm with the same model architecture. |
 | pasting_cutoff | The cutoff position on the discretized timestamps for the pasting algorithm | A positive integer between 0 and T. |
 
 <!-- 

@@ -297,11 +297,14 @@ class DynamicsFactory():
         pass
     
     ## TODO: Implement it -- Zhanhao Zhang
-    def leading_order_quad(self, model = None, time_len = None):
+    def leading_order_quad(self, model = None, time_len = None, phi_0 = None):
         if time_len is None:
             time_len = self.T
         phi_stm = torch.zeros((N_SAMPLE, time_len + 1, N_STOCK)).to(device = DEVICE)
-        phi_stm[:,0,:] = S_OUTSTANDING / 2
+        if phi_0 is None:
+            phi_stm[:,0,:] = S_OUTSTANDING / 2
+        else:
+            phi_stm[:,0,:] = phi_0
         phi_dot_stm = torch.zeros((N_SAMPLE, time_len, N_STOCK)).to(device = DEVICE)
         for t in range(time_len):
             phi_dot_stm[:,t,:] = -(phi_stm[:,t,:] - self.phi_stm_bar[:,t,:]) @ self.lam_mm_negHalf @ self.const_mm @ self.lam_mm_half
@@ -313,9 +316,12 @@ class DynamicsFactory():
         pass
     
     ## TODO: Implement it -- Zhanhao Zhang
-    def ground_truth(self, model = None):
+    def ground_truth(self, model = None, phi_0 = None):
         phi_stm = torch.zeros((N_SAMPLE, self.T + 1, N_STOCK)).to(device = DEVICE)
-        phi_stm[:,0,:] = S_OUTSTANDING / 2
+        if phi_0 is None:
+            phi_stm[:,0,:] = S_OUTSTANDING / 2
+        else:
+            phi_stm[:,0,:] = phi_0
         phi_dot_stm = torch.zeros((N_SAMPLE, self.T, N_STOCK)).to(device = DEVICE)
         for t in range(self.T):
             tanh_inner = self.const_mm / T * (self.T - t - 1) * TR
@@ -524,8 +530,8 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
     curr_ts = model_factory.save_to_file()
     
     ## Compute Ground Truth
-    phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_truth = evaluation(dW_std, curr_ts, None, algo = "ground_truth", cost = cost, visualize_obs = 0)
-    phi_dot_stm_leading_order, phi_stm_leading_order, loss_leading_order = evaluation(dW_std, curr_ts, None, algo = "leading_order", cost = cost, visualize_obs = 0)
+    phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_truth = evaluation(dW_std, curr_ts, None, algo = "ground_truth", cost = cost, visualize_obs = 0, phi_0 = phi_stm[0,0,:])
+    phi_dot_stm_leading_order, phi_stm_leading_order, loss_leading_order = evaluation(dW_std, curr_ts, None, algo = "leading_order", cost = cost, visualize_obs = 0, phi_0 = phi_stm[0,0,:])
     
     ## Visualize loss and results
     visualize_loss(loss_arr, curr_ts, loss_truth)
@@ -534,7 +540,7 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         Visualize_dyn_comp(time_lst[1:], [phi_dot_stm[0,:,:], phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts + "_training", "phi_dot", [train_args["algo"], "leading_order", "ground_truth"])
     return model, loss_arr, prev_ts, curr_ts
 
-def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "quadratic", visualize_obs = 0, pasting_cutoff = 0):
+def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "quadratic", visualize_obs = 0, pasting_cutoff = 0, phi_0 = None):
     assert algo in ["deep_hedging", "fbsde", "pasting", "leading_order", "ground_truth"]
     assert cost in ["quadratic", "power"]
     if cost == "quadratic":
@@ -545,7 +551,7 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
     dynamic_factory = DynamicsFactory(time_lst, dW_std)
     W_std, mu_stm, sigma_stmd, s_tm, xi_dd, lam_mm, alpha_md, beta_m = dynamic_factory.get_constant_processes()
     if algo == "deep_hedging":
-        phi_dot_stm, phi_stm = dynamic_factory.deep_hedging(model)
+        phi_dot_stm, phi_stm = dynamic_factory.deep_hedging(model, phi_0 = phi_0)
     elif algo == "fbsde":
         if cost == "quadratic":
             phi_dot_stm, phi_stm = dynamic_factory.fbsde_quad(model)
@@ -557,12 +563,12 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
         phi_dot_stm, phi_stm = dynamic_factory.pasting(model, pasting_cutoff)
     elif algo == "leading_order":
         if cost == "quadratic":
-            phi_dot_stm, phi_stm = dynamic_factory.leading_order_quad(model)
+            phi_dot_stm, phi_stm = dynamic_factory.leading_order_quad(model, phi_0 = phi_0)
         else:
             phi_dot_stm, phi_stm = dynamic_factory.leading_order_power(model)
     else:
         assert cost == "quadratic"
-        phi_dot_stm, phi_stm = dynamic_factory.ground_truth(model)
+        phi_dot_stm, phi_stm = dynamic_factory.ground_truth(model, phi_0 = phi_0)
     loss_factory = LossFactory(time_lst, dW_std)
     loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power)
     

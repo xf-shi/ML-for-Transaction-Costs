@@ -35,9 +35,13 @@ N_BM = BM_COV.shape[0]
 
 ## TODO: Adjust this function to get constant processes
 ## Compute constants processes using dW
-def get_constants(dW_std):
+def get_constants(dW_std, W_s0d = None):
     time_len = dW_std.shape[1]
-    W_std = torch.cumsum(torch.cat((torch.zeros((N_SAMPLE, 1, N_BM)), dW_std.cpu()), dim=1), dim=1)
+    if W_s0d is not None:
+        W_0 = W_s0d.reshape((N_SAMPLE, 1, N_BM)).cpu()
+    else:
+        W_0 = torch.zeros((N_SAMPLE, 1, N_BM))
+    W_std = torch.cumsum(torch.cat((W_0, dW_std.cpu()), dim=1), dim=1)
     
     mu_stm = torch.ones((N_SAMPLE, time_len, N_STOCK)) * torch.tensor([[2.99, 3.71, 3.55]]) #torch.tensor([[2.99, 3.71, 3.55]]).repeat(T,1)
     sigma_big = torch.tensor([[72.00, 71.49, 54.80],[71.49, 85.42, 65.86],[54.80, 65.86, 56.84]])
@@ -81,7 +85,7 @@ else:
 ## Set seed globally
 torch.manual_seed(0)
 
-MULTI_NORMAL = MultivariateNormal(torch.zeros((N_SAMPLE, T, N_BM)), BM_COV)
+MULTI_NORMAL = MultivariateNormal(torch.zeros((N_SAMPLE, T, N_BM)), BM_COV * TR / T)
 dW_STD = MULTI_NORMAL.sample().to(device = DEVICE)
 W_STD, MU_STM, SIGMA_STMD, S_TM, XI_DD, LAM_MM, ALPHA_MD, BETA_M = get_constants(dW_STD)
 
@@ -221,10 +225,10 @@ class ModelFactory:
 ## TODO: Implement it
 ## Return tensors of phi_dot and phi at each timestamp t
 class DynamicsFactory():
-    def __init__(self, ts_lst, dW_std):
+    def __init__(self, ts_lst, dW_std, W_s0d = None):
         assert ts_lst[0] == 0
         self.dW_std = dW_std
-        self.W_std, self.mu_stm, self.sigma_stmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m = get_constants(dW_std)
+        self.W_std, self.mu_stm, self.sigma_stmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m = get_constants(dW_std, W_s0d)
         self.lam_mm_half = self.mat_frac_pow(self.lam_mm, 1/2)
         self.lam_mm_negHalf = self.mat_frac_pow(self.lam_mm, -1/2)
         self.alpha_mm_sq = self.alpha_md @ self.alpha_md.T
@@ -352,7 +356,7 @@ class DynamicsFactory():
     
     ## TODO: Implement it -- Zhanhao Zhang
     def random_deep_hedging(self, model, time_len = T):
-        phi_0 = torch.rand(N_STOCK) * 2
+        phi_0 = torch.tensor([0.1603, -0.7572,  1.5443]) #S_OUTSTANDING / 2 #torch.rand(N_STOCK) * 2
         phi_dot_stm, phi_stm = self.deep_hedging(model, time_len = time_len, phi_0 = phi_0)
         return phi_dot_stm, phi_stm
     
@@ -372,10 +376,10 @@ class DynamicsFactory():
 ## TODO: Implement it
 ## Return the loss as a tensor
 class LossFactory():
-    def __init__(self, ts_lst, dW_std):
+    def __init__(self, ts_lst, dW_std, W_s0d = None):
         assert ts_lst[0] == 0
         self.dW_std = dW_std
-        self.W_std, self.mu_stm, self.sigma_stmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m = get_constants(dW_std)
+        self.W_std, self.mu_stm, self.sigma_stmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m = get_constants(dW_std, W_s0d)
         self.mse_loss_func=torch.nn.MSELoss()
 
     ## TODO: Implement it -- Zhanhao Zhang
@@ -403,6 +407,7 @@ def visualize_loss(loss_arr, ts, loss_truth):
     plt.plot(loss_arr)
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
+    plt.axhline(y = loss_arr[-1], color = "red")
     plt.title(f"Final Loss = {round(loss_arr[-1], 2)}, True Loss = {round(loss_truth, 2)}")
     plt.savefig(f"{drive_dir}/Plots/loss_{ts}.png")
     plt.close()
@@ -487,7 +492,8 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         output_dim = N_STOCK
         input_dim = N_BM + N_STOCK + 1
     if algo == "pasting":
-        multi_normal = MultivariateNormal(torch.zeros((N_SAMPLE, T - pasting_cutoff, N_BM)), BM_COV)
+        multi_normal = MultivariateNormal(torch.zeros((N_SAMPLE, T - pasting_cutoff, N_BM)), BM_COV * TR / T)
+        multi_normal_0 = MultivariateNormal(torch.zeros((N_SAMPLE, N_BM)), BM_COV * pasting_cutoff / T * TR)
         time_lst = TIMESTAMPS[:(T - pasting_cutoff + 1)]
     else:
         multi_normal = MULTI_NORMAL
@@ -501,8 +507,12 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         optimizer.zero_grad()
         ## TODO: Implement it
         dW_std = multi_normal.sample().to(device = DEVICE)
-        dynamic_factory = DynamicsFactory(time_lst, dW_std)
-        loss_factory = LossFactory(time_lst, dW_std)
+        if algo == "pasting":
+            W_s0d = multi_normal_0.sample().to(device = DEVICE)
+        else:
+            W_s0d = None
+        dynamic_factory = DynamicsFactory(time_lst, dW_std, W_s0d)
+        loss_factory = LossFactory(time_lst, dW_std, W_s0d)
         
         if algo == "deep_hedging":
             phi_dot_stm, phi_stm = dynamic_factory.deep_hedging(model)
@@ -530,8 +540,8 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
     curr_ts = model_factory.save_to_file()
     
     ## Compute Ground Truth
-    phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_truth = evaluation(dW_std, curr_ts, None, algo = "ground_truth", cost = cost, visualize_obs = 0, phi_0 = phi_stm[0,0,:])
-    phi_dot_stm_leading_order, phi_stm_leading_order, loss_leading_order = evaluation(dW_std, curr_ts, None, algo = "leading_order", cost = cost, visualize_obs = 0, phi_0 = phi_stm[0,0,:])
+    phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_truth = evaluation(dW_std, curr_ts, None, algo = "ground_truth", cost = cost, visualize_obs = 0, phi_0 = phi_stm[0,0,:], W_s0d = W_s0d)
+    phi_dot_stm_leading_order, phi_stm_leading_order, loss_leading_order = evaluation(dW_std, curr_ts, None, algo = "leading_order", cost = cost, visualize_obs = 0, phi_0 = phi_stm[0,0,:], W_s0d = W_s0d)
     
     ## Visualize loss and results
     visualize_loss(loss_arr, curr_ts, loss_truth)
@@ -540,7 +550,7 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         Visualize_dyn_comp(time_lst[1:], [phi_dot_stm[0,:,:], phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts + "_training", "phi_dot", [train_args["algo"], "leading_order", "ground_truth"])
     return model, loss_arr, prev_ts, curr_ts
 
-def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "quadratic", visualize_obs = 0, pasting_cutoff = 0, phi_0 = None):
+def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "quadratic", visualize_obs = 0, pasting_cutoff = 0, phi_0 = None, W_s0d = None):
     assert algo in ["deep_hedging", "fbsde", "pasting", "leading_order", "ground_truth"]
     assert cost in ["quadratic", "power"]
     if cost == "quadratic":
@@ -548,7 +558,7 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
     else:
         power = 3 / 2
     time_lst = TIMESTAMPS[:(dW_std.shape[1] + 1)]
-    dynamic_factory = DynamicsFactory(time_lst, dW_std)
+    dynamic_factory = DynamicsFactory(time_lst, dW_std, W_s0d)
     W_std, mu_stm, sigma_stmd, s_tm, xi_dd, lam_mm, alpha_md, beta_m = dynamic_factory.get_constant_processes()
     if algo == "deep_hedging":
         phi_dot_stm, phi_stm = dynamic_factory.deep_hedging(model, phi_0 = phi_0)
@@ -569,7 +579,7 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
     else:
         assert cost == "quadratic"
         phi_dot_stm, phi_stm = dynamic_factory.ground_truth(model, phi_0 = phi_0)
-    loss_factory = LossFactory(time_lst, dW_std)
+    loss_factory = LossFactory(time_lst, dW_std, W_s0d)
     loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power)
     
 #    Visualize_dyn(TIMESTAMPS[1:], phi_stm[0,1:,:], curr_ts, "phi")

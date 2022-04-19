@@ -363,7 +363,7 @@ class DynamicsFactory():
     ## TODO: Implement it -- Zhanhao Zhang
     def pasting(self, model, M):
         phi_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device = DEVICE)
-        phi_stm[:,0,:] = S_OUTSTANDING / 2
+#         phi_stm[:,0,:] = S_OUTSTANDING / 2
         phi_dot_stm = torch.zeros((N_SAMPLE, T, N_STOCK)).to(device = DEVICE)
         phi_dot_stm_leading_order, phi_stm_leading_order = self.leading_order_quad(time_len = M)
         phi_dot_stm_deep_hedging, phi_stm_deep_hedging = self.deep_hedging(model, time_len = T - M, phi_0 = phi_stm_leading_order[:,-1,:].data, start_t = M)
@@ -513,7 +513,7 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
             W_s0d = None
         dynamic_factory = DynamicsFactory(time_lst, dW_std, W_s0d)
         loss_factory = LossFactory(time_lst, dW_std, W_s0d)
-        
+
         if algo == "deep_hedging":
             phi_dot_stm, phi_stm = dynamic_factory.deep_hedging(model)
             loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power)
@@ -529,25 +529,28 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         ## End here ##
         loss_arr.append(float(loss.data))
         loss.backward()
-        
+
         if torch.isnan(loss.data):
             break
         optimizer.step()
         scheduler.step()
     
-    ## Update and save model
-    model_factory.update_model(model)
-    curr_ts = model_factory.save_to_file()
-    
-    ## Compute Ground Truth
-    phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_truth = evaluation(dW_std, curr_ts, None, algo = "ground_truth", cost = cost, visualize_obs = 0, phi_0 = phi_stm[0,0,:], W_s0d = W_s0d)
-    phi_dot_stm_leading_order, phi_stm_leading_order, loss_leading_order = evaluation(dW_std, curr_ts, None, algo = "leading_order", cost = cost, visualize_obs = 0, phi_0 = phi_stm[0,0,:], W_s0d = W_s0d)
-    
-    ## Visualize loss and results
-    visualize_loss(loss_arr, curr_ts, loss_truth)
-    if algo == "pasting":
-        Visualize_dyn_comp(time_lst[1:], [phi_stm[0,1:,:], phi_stm_leading_order[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts + "_training", "phi", [train_args["algo"], "leading_order", "ground_truth"])
-        Visualize_dyn_comp(time_lst[1:], [phi_dot_stm[0,:,:], phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts + "_training", "phi_dot", [train_args["algo"], "leading_order", "ground_truth"])
+    if epoch > 0:
+        ## Update and save model
+        model_factory.update_model(model)
+        curr_ts = model_factory.save_to_file()
+
+        ## Compute Ground Truth
+        phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_truth = evaluation(dW_std, curr_ts, None, algo = "ground_truth", cost = cost, visualize_obs = 0, phi_0 = phi_stm[:,0,:], W_s0d = W_s0d)
+        phi_dot_stm_leading_order, phi_stm_leading_order, loss_leading_order = evaluation(dW_std, curr_ts, None, algo = "leading_order", cost = cost, visualize_obs = 0, phi_0 = phi_stm[:,0,:], W_s0d = W_s0d)
+
+        ## Visualize loss and results
+        visualize_loss(loss_arr, curr_ts, loss_truth)
+        if algo == "pasting":
+            Visualize_dyn_comp(time_lst[1:], [phi_stm[0,1:,:], phi_stm_leading_order[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts + "_training", "phi", [train_args["algo"], "leading_order", "ground_truth"])
+            Visualize_dyn_comp(time_lst[1:], [phi_dot_stm[0,:,:], phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts + "_training", "phi_dot", [train_args["algo"], "leading_order", "ground_truth"])
+    else:
+        curr_ts = "test"
     return model, loss_arr, prev_ts, curr_ts
 
 def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "quadratic", visualize_obs = 0, pasting_cutoff = 0, phi_0 = None, W_s0d = None):
@@ -596,8 +599,8 @@ train_args = {
     "model_name": "discretized_feedforward",
     "solver": "Adam",
     "hidden_lst": [50],
-    "lr": 1e-3,
-    "epoch": 100,
+    "lr": 1e-4,
+    "epoch": 0,#10000,
     "decay": 0.1,
     "scheduler_step": 100000,
     "retrain": False,
@@ -607,14 +610,16 @@ train_args = {
 
 #curr_ts = "test"
 model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
+model.eval()
 phi_dot_stm_algo, phi_stm_algo, loss_eval_algo = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0, pasting_cutoff = train_args["pasting_cutoff"])
 phi_dot_stm_leading_order, phi_stm_leading_order, loss_eval_leading_order = evaluation(dW_STD, curr_ts, None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0)
 phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_eval_ground_truth = evaluation(dW_STD, curr_ts, None, algo = "ground_truth", cost = train_args["cost"], visualize_obs = 0)
 
 #Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_algo[0,1:,0], phi_stm_ground_truth[0,1:,0]], curr_ts, "phi", [train_args["algo"], "ground_truth"])
 #Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_algo[0,:,0], phi_dot_stm_ground_truth[0,:,0]], curr_ts, "phi_dot", [train_args["algo"], "ground_truth"])
-Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_algo[0,1:,:], phi_stm_leading_order[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts, "phi", [train_args["algo"], "leading_order", "ground_truth"])
-Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_algo[0,:,:], phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts, "phi_dot", [train_args["algo"], "leading_order", "ground_truth"])
+vis_start = 0#4500
+Visualize_dyn_comp(TIMESTAMPS[(vis_start+1):], [phi_stm_algo[0,(vis_start+1):,:], phi_stm_leading_order[0,(vis_start+1):,:], phi_stm_ground_truth[0,(vis_start+1):,:]], curr_ts, "phi", [train_args["algo"], "leading_order", "ground_truth"])
+Visualize_dyn_comp(TIMESTAMPS[(vis_start+1):], [phi_dot_stm_algo[0,vis_start:,:], phi_dot_stm_leading_order[0,vis_start:,:], phi_dot_stm_ground_truth[0,vis_start:,:]], curr_ts, "phi_dot", [train_args["algo"], "leading_order", "ground_truth"])
 
 #Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_leading_order[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts, "phi", ["leading_order", "ground_truth"])
 #Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts, "phi_dot", ["leading_order", "ground_truth"])

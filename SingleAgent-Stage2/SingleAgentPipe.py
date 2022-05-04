@@ -566,7 +566,7 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
         else:
             phi_dot_stm, phi_stm = dynamic_factory.fbsde_power(model)
         ### to match the dim
-        phi_dot_stm = phi_dot_stm[:,:-1,:]
+        phi_dot_stm = phi_dot_stm[:,1:,:]
     elif algo == "pasting":
         phi_dot_stm, phi_stm = dynamic_factory.pasting(model, pasting_cutoff)
     elif algo == "leading_order":

@@ -258,7 +258,7 @@ class DynamicsFactory():
         phi_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device=DEVICE)
         phi_stm[:, 0, :] = S_OUTSTANDING / 2
         phi_dot_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device=DEVICE)  # note here phi_dot has T+1 timesteps
-        curr_t = torch.ones((N_SAMPLE, 1))
+        curr_t = torch.ones((N_SAMPLE, 1)).to(device = DEVICE)
         phi_dot_stm[:, 0, :] = model((-1, curr_t)) #curr_t as dummy input
         for t in range(T):
             phi_stm[:, t + 1, :] = phi_stm[:, t, :] + phi_dot_stm[:, t, :] * TR / T

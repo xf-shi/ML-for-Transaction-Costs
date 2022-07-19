@@ -18,14 +18,15 @@ from tqdm import tqdm
 import sys
 
 ## TODO: Adjust these global constants:
-T = 5000 #
+T = 2520 #5000 #
 TR = 2520 #???
 N_SAMPLE = 128
-N_STOCK = 3
-COEF_ = 1e11
-S_OUTSTANDING = torch.tensor([1.15, 0.32, 0.23]) *1e10 / COEF_
-GAMMA = 1/(1/ (8.91*1e-13) + 1/ (4.45 * 1e-12) ) * COEF_
-BM_COV = torch.eye(3) #[[1, 0.5], [0.5, 1]]
+POWER = 3/2 #2
+N_STOCK = 1 # 3
+COEF_ = 1e12 # 1e11
+S_OUTSTANDING = torch.tensor([2.46]) * 1e11 / COEF_ #torch.tensor([1.15, 0.32, 0.23]) *1e10 / COEF_
+GAMMA = 1.66e-13 * COEF_ #1/(1/ (8.91*1e-13) + 1/ (4.45 * 1e-12) ) * COEF_
+BM_COV = torch.eye(1) #torch.eye(3) #[[1, 0.5], [0.5, 1]]
 ## END HERE ##
 
 TIMESTAMPS = np.linspace(0, TR, T + 1)
@@ -35,7 +36,7 @@ N_BM = BM_COV.shape[0]
 
 ## TODO: Adjust this function to get constant processes
 ## Compute constants processes using dW
-def get_constants(dW_std, W_s0d = None):
+def get_constants_high_dim(dW_std, W_s0d = None):
     time_len = dW_std.shape[1]
     if W_s0d is not None:
         W_0 = W_s0d.reshape((N_SAMPLE, 1, N_BM)).cpu()
@@ -52,6 +53,30 @@ def get_constants(dW_std, W_s0d = None):
     lam_mm = torch.diag(torch.tensor([0.1269, 0.3354, 0.8595])) * 1e-8 * COEF_ * 0.01 #torch.ones((N_STOCK, N_STOCK))
     alpha_md = sigma_md.clone() #torch.ones((N_STOCK, N_BM)) #???
     beta_m = torch.ones(N_STOCK) #???
+
+    return W_std.to(device = DEVICE), mu_stm.to(device = DEVICE), sigma_stmd.to(device = DEVICE), s_tm.to(device = DEVICE), xi_dd.to(device = DEVICE), lam_mm.to(device = DEVICE), alpha_md.to(device = DEVICE), beta_m.to(device = DEVICE)
+
+## Compute constants processes using dW
+def get_constants(dW_std, W_s0d = None):
+    time_len = dW_std.shape[1]
+    if W_s0d is not None:
+        W_0 = W_s0d.reshape((N_SAMPLE, 1, N_BM)).cpu()
+    else:
+        W_0 = torch.zeros((N_SAMPLE, 1, N_BM))
+    W_std = torch.cumsum(torch.cat((W_0, dW_std.cpu()), dim=1), dim=1)
+    
+    mu_stm = torch.ones((N_SAMPLE, time_len, N_STOCK)) * 0.072069
+    sigma_md = torch.tensor([[1.88]])
+    sigma_stmd = torch.ones((N_SAMPLE, time_len, N_STOCK, N_BM)) * sigma_md
+    s_tm = torch.ones((time_len, N_STOCK))
+    if POWER == 2:
+        xi_dd = torch.tensor([[2.19]]) * 1e10 / COEF_
+        lam_mm = torch.diag(torch.tensor([1.08])) * 1e-10 * COEF_ * 1
+    else: # POWER = 3/2
+        xi_dd = torch.tensor([[2.33]]) * 1e10 / COEF_
+        lam_mm = torch.diag(torch.tensor([5.22])) * 1e-6 * (COEF_ ** 0.5) * 1
+    alpha_md = sigma_md.clone()
+    beta_m = torch.ones(N_STOCK)
 
     return W_std.to(device = DEVICE), mu_stm.to(device = DEVICE), sigma_stmd.to(device = DEVICE), s_tm.to(device = DEVICE), xi_dd.to(device = DEVICE), lam_mm.to(device = DEVICE), alpha_md.to(device = DEVICE), beta_m.to(device = DEVICE)
 
@@ -225,7 +250,7 @@ class ModelFactory:
 ## TODO: Implement it
 ## Return tensors of phi_dot and phi at each timestamp t
 class DynamicsFactory():
-    def __init__(self, ts_lst, dW_std, W_s0d = None):
+    def __init__(self, ts_lst, dW_std, W_s0d = None, g_dir = None):
         assert ts_lst[0] == 0
         self.dW_std = dW_std
         self.W_std, self.mu_stm, self.sigma_stmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m = get_constants(dW_std, W_s0d)
@@ -241,6 +266,9 @@ class DynamicsFactory():
                 self.sigma_stmm_sq_inv[s,t,:,:] = torch.inverse(self.sigma_stmm_sq[s,t,:,:]) #self.sigma_stmm_sq_inv[t,:,:] #
         self.xi_std_w = torch.einsum("ijk, kl -> ijl", self.W_std[:,1:,:], self.xi_dd)
         self.phi_stm_bar = 1 / GAMMA * torch.einsum("sijk, sik -> sij", self.sigma_stmm_sq_inv, self.mu_stm) - torch.einsum("ijlk, ijk -> ijl", torch.einsum("sijk, sikl -> sijl", self.sigma_stmm_sq_inv, self.sigma_stmd), self.xi_std_w)
+        if g_dir is not None:
+            with open(g_dir, "r") as f:
+                self.G_MAP = torch.tensor([float(x.strip()) for x in f.readlines()])
     
     def get_constant_processes(self):
         return self.W_std, self.mu_stm, self.sigma_stmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m
@@ -315,9 +343,31 @@ class DynamicsFactory():
             phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] / T * TR
         return phi_dot_stm, phi_stm
     
-    ## TODO: Implement it -- TBD
-    def leading_order_power(self, model = None):
-        pass
+    def g_vec(self, x):
+        q = 3 / 2
+        x_ind = torch.round((x + 0) / 50 * 500000).long()
+        x_inbound = (torch.abs(x) <= 50) + 0
+        x_outbound = -torch.sign(x) * q * (q - 1) ** (-(q - 1) / q) * torch.abs(x) ** (2 * (q - 1) / q)
+        return torch.sign(x) * self.G_MAP[x_ind * x_inbound] + x_outbound * (1 - x_inbound)
+    
+    ## TODO: Implement it -- Zhanhao Zhang
+    def leading_order_power(self, power, model = None, time_len = None, phi_0 = None):
+        # Currently only support 1-dim
+        if time_len is None:
+            time_len = self.T
+        phi_stm = torch.zeros((N_SAMPLE, time_len + 1, N_STOCK)).to(device = DEVICE)
+        if phi_0 is None:
+            phi_stm[:,0,:] = S_OUTSTANDING / 2
+        else:
+            phi_stm[:,0,:] = phi_0
+        phi_dot_stm = torch.zeros((N_SAMPLE, time_len, N_STOCK)).to(device = DEVICE)
+        for t in range(time_len):
+            phi_sm_minus_bar = phi_stm[:,t,:] - self.phi_stm_bar[:,t,:]
+            outer = -torch.sign(phi_sm_minus_bar) * (power * GAMMA * torch.sum(self.xi_dd) ** 4 / 8 / torch.sum(self.lam_mm) / torch.sum(self.alpha_md) ** 2) ** (1 / (power + 2))
+            inner = 2 ** ((power - 1) / (power + 2)) * ((power * GAMMA * torch.sum(self.alpha_md) ** 2 / torch.sum(self.lam_mm)) ** (1 / (power + 2))) * ((torch.sum(self.alpha_md) / torch.sum(self.xi_dd)) ** (2 * power / (power + 2))) * phi_sm_minus_bar
+            phi_dot_stm[:,t,:] = outer * torch.abs(self.g_vec(inner) / power)
+            phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] / T * TR
+        return phi_dot_stm, phi_stm
     
     ## TODO: Implement it -- Zhanhao Zhang
     def ground_truth(self, model = None, phi_0 = None):
@@ -356,7 +406,7 @@ class DynamicsFactory():
     
     ## TODO: Implement it -- Zhanhao Zhang
     def random_deep_hedging(self, model, time_len = T):
-        phi_0 = torch.tensor([0.1603, -0.7572,  1.5443]) #S_OUTSTANDING / 2 #torch.rand(N_STOCK) * 2
+        phi_0 = S_OUTSTANDING / 2 #torch.tensor([0.0751]) #torch.tensor([0.1603, -0.7572,  1.5443]) #torch.rand(N_STOCK) * 2
         phi_dot_stm, phi_stm = self.deep_hedging(model, time_len = time_len, phi_0 = phi_0)
         return phi_dot_stm, phi_stm
     
@@ -365,7 +415,11 @@ class DynamicsFactory():
         phi_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device = DEVICE)
 #         phi_stm[:,0,:] = S_OUTSTANDING / 2
         phi_dot_stm = torch.zeros((N_SAMPLE, T, N_STOCK)).to(device = DEVICE)
-        phi_dot_stm_leading_order, phi_stm_leading_order = self.leading_order_quad(time_len = M)
+        if POWER == 2:
+            phi_dot_stm_leading_order, phi_stm_leading_order = self.leading_order_quad(time_len = M)
+        else:
+            phi_dot_stm_leading_order, phi_stm_leading_order = self.leading_order_power(POWER, time_len = M)
+#        print(phi_stm_leading_order[:,-1,:])
         phi_dot_stm_deep_hedging, phi_stm_deep_hedging = self.deep_hedging(model, time_len = T - M, phi_0 = phi_stm_leading_order[:,-1,:].data, start_t = M)
         phi_dot_stm[:,:M,:] += phi_dot_stm_leading_order
         phi_stm[:,:(M+1),:] += phi_stm_leading_order
@@ -384,8 +438,13 @@ class LossFactory():
 
     ## TODO: Implement it -- Zhanhao Zhang
     def utility_loss(self, phi_dot_stm, phi_stm, power):
-        loss_mat = torch.einsum("ijk, ijk -> ij", phi_stm[:,1:,:], self.mu_stm) - GAMMA / 2 * torch.einsum("ijk -> ij", (torch.einsum("ijk, ijkl -> ijl", phi_stm[:,1:,:], self.sigma_stmd) + torch.einsum("ijk, kl -> ijl", self.W_std[:,1:,:], self.xi_dd)) ** 2) - 1 / 2 * torch.einsum("ijk, lk, ijl -> ij", phi_dot_stm, self.lam_mm, phi_dot_stm)
-        loss_compact = -torch.sum(loss_mat / N_SAMPLE / T * TR) / TR
+        if power == 2:
+            loss_mat = torch.einsum("ijk, ijk -> ij", phi_stm[:,1:,:], self.mu_stm) - GAMMA / 2 * torch.einsum("ijk -> ij", (torch.einsum("ijk, ijkl -> ijl", phi_stm[:,1:,:], self.sigma_stmd) + torch.einsum("ijk, kl -> ijl", self.W_std[:,1:,:], self.xi_dd)) ** 2) - 1 / 2 * torch.einsum("ijk, lk, ijl -> ij", phi_dot_stm, self.lam_mm, phi_dot_stm)
+            loss_compact = -torch.sum(loss_mat / N_SAMPLE / T * TR) / TR
+        else:
+            ## Currently only support 1-dim.
+            loss_mat = torch.einsum("ijk, ijk -> ij", phi_stm[:,1:,:], self.mu_stm) - GAMMA / 2 * torch.einsum("ijk -> ij", (torch.einsum("ijk, ijkl -> ijl", phi_stm[:,1:,:], self.sigma_stmd) + torch.einsum("ijk, kl -> ijl", self.W_std[:,1:,:], self.xi_dd)) ** 2) - 1 / power * torch.einsum("ijk, lk -> ij", torch.abs(phi_dot_stm) ** power, self.lam_mm)
+            loss_compact = -torch.sum(loss_mat / N_SAMPLE / T * TR) / TR
         return loss_compact
     
     ## TODO: Implement it -- Zhanhao Zhang
@@ -511,7 +570,7 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
             W_s0d = multi_normal_0.sample().to(device = DEVICE)
         else:
             W_s0d = None
-        dynamic_factory = DynamicsFactory(time_lst, dW_std, W_s0d)
+        dynamic_factory = DynamicsFactory(time_lst, dW_std, W_s0d, g_dir = "eva.txt")
         loss_factory = LossFactory(time_lst, dW_std, W_s0d)
 
         if algo == "deep_hedging":
@@ -541,14 +600,22 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         curr_ts = model_factory.save_to_file()
 
         ## Compute Ground Truth
-        phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_truth = evaluation(dW_std, curr_ts, None, algo = "ground_truth", cost = cost, visualize_obs = 0, phi_0 = phi_stm[:,0,:], W_s0d = W_s0d)
+        if cost == "quadratic":
+            phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_truth = evaluation(dW_std, curr_ts, None, algo = "ground_truth", cost = cost, visualize_obs = 0, phi_0 = phi_stm[:,0,:], W_s0d = W_s0d)
         phi_dot_stm_leading_order, phi_stm_leading_order, loss_leading_order = evaluation(dW_std, curr_ts, None, algo = "leading_order", cost = cost, visualize_obs = 0, phi_0 = phi_stm[:,0,:], W_s0d = W_s0d)
 
         ## Visualize loss and results
-        visualize_loss(loss_arr, curr_ts, loss_truth)
+        if cost == "quadratic":
+            visualize_loss(loss_arr, curr_ts, loss_truth)
+        else:
+            visualize_loss(loss_arr, curr_ts, loss_leading_order)
         if algo == "pasting":
-            Visualize_dyn_comp(time_lst[1:], [phi_stm[0,1:,:], phi_stm_leading_order[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts + "_training", "phi", [train_args["algo"], "leading_order", "ground_truth"])
-            Visualize_dyn_comp(time_lst[1:], [phi_dot_stm[0,:,:], phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts + "_training", "phi_dot", [train_args["algo"], "leading_order", "ground_truth"])
+            if cost == "quadratic":
+                Visualize_dyn_comp(time_lst[1:], [phi_stm[0,1:,:], phi_stm_leading_order[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts + "_training", "phi", [train_args["algo"], "leading_order", "ground_truth"])
+                Visualize_dyn_comp(time_lst[1:], [phi_dot_stm[0,:,:], phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts + "_training", "phi_dot", [train_args["algo"], "leading_order", "ground_truth"])
+            else:
+                Visualize_dyn_comp(time_lst[1:], [phi_stm[0,1:,:], phi_stm_leading_order[0,1:,:]], curr_ts + "_training", "phi", [train_args["algo"], "leading_order"])
+                Visualize_dyn_comp(time_lst[1:], [phi_dot_stm[0,:,:], phi_dot_stm_leading_order[0,:,:]], curr_ts + "_training", "phi_dot", [train_args["algo"], "leading_order"])
     else:
         curr_ts = "test"
     return model, loss_arr, prev_ts, curr_ts
@@ -561,7 +628,7 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
     else:
         power = 3 / 2
     time_lst = TIMESTAMPS[:(dW_std.shape[1] + 1)]
-    dynamic_factory = DynamicsFactory(time_lst, dW_std, W_s0d)
+    dynamic_factory = DynamicsFactory(time_lst, dW_std, W_s0d, g_dir = "eva.txt")
     W_std, mu_stm, sigma_stmd, s_tm, xi_dd, lam_mm, alpha_md, beta_m = dynamic_factory.get_constant_processes()
     if algo == "deep_hedging":
         phi_dot_stm, phi_stm = dynamic_factory.deep_hedging(model, phi_0 = phi_0)
@@ -578,7 +645,7 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
         if cost == "quadratic":
             phi_dot_stm, phi_stm = dynamic_factory.leading_order_quad(model, phi_0 = phi_0)
         else:
-            phi_dot_stm, phi_stm = dynamic_factory.leading_order_power(model)
+            phi_dot_stm, phi_stm = dynamic_factory.leading_order_power(POWER, model)
     else:
         assert cost == "quadratic"
         phi_dot_stm, phi_stm = dynamic_factory.ground_truth(model, phi_0 = phi_0)
@@ -591,20 +658,25 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
 #    Visualize_dyn(TIMESTAMPS[1:], mu_stm, curr_ts, "mu")
 #    Visualize_dyn(TIMESTAMPS[1:], s_tm, curr_ts, "s")
     return phi_dot_stm, phi_stm, float(loss.data)
-        
+
+if POWER == 2:
+    cost = "quadratic"
+else:
+    cost = "power"
+
 ## TODO: Adjust the arguments for training
 train_args = {
     "algo": "pasting",
-    "cost": "quadratic",
+    "cost": cost,
     "model_name": "discretized_feedforward",
     "solver": "Adam",
     "hidden_lst": [50],
-    "lr": 1e-4,
-    "epoch": 0,#10000,
+    "lr": 1e-3, #1e-4,
+    "epoch": 100,#10000,
     "decay": 0.1,
     "scheduler_step": 100000,
     "retrain": False,
-    "pasting_cutoff": 4800,
+    "pasting_cutoff": 2400, #4800,
     "n_sample": N_SAMPLE
 }
 
@@ -613,13 +685,18 @@ model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
 model.eval()
 phi_dot_stm_algo, phi_stm_algo, loss_eval_algo = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0, pasting_cutoff = train_args["pasting_cutoff"])
 phi_dot_stm_leading_order, phi_stm_leading_order, loss_eval_leading_order = evaluation(dW_STD, curr_ts, None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0)
-phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_eval_ground_truth = evaluation(dW_STD, curr_ts, None, algo = "ground_truth", cost = train_args["cost"], visualize_obs = 0)
+if cost == "quadratic":
+    phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_eval_ground_truth = evaluation(dW_STD, curr_ts, None, algo = "ground_truth", cost = train_args["cost"], visualize_obs = 0)
 
 #Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_algo[0,1:,0], phi_stm_ground_truth[0,1:,0]], curr_ts, "phi", [train_args["algo"], "ground_truth"])
 #Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_algo[0,:,0], phi_dot_stm_ground_truth[0,:,0]], curr_ts, "phi_dot", [train_args["algo"], "ground_truth"])
 vis_start = 0#4500
-Visualize_dyn_comp(TIMESTAMPS[(vis_start+1):], [phi_stm_algo[0,(vis_start+1):,:], phi_stm_leading_order[0,(vis_start+1):,:], phi_stm_ground_truth[0,(vis_start+1):,:]], curr_ts, "phi", [train_args["algo"], "leading_order", "ground_truth"])
-Visualize_dyn_comp(TIMESTAMPS[(vis_start+1):], [phi_dot_stm_algo[0,vis_start:,:], phi_dot_stm_leading_order[0,vis_start:,:], phi_dot_stm_ground_truth[0,vis_start:,:]], curr_ts, "phi_dot", [train_args["algo"], "leading_order", "ground_truth"])
+if cost == "quadratic":
+    Visualize_dyn_comp(TIMESTAMPS[(vis_start+1):], [phi_stm_algo[0,(vis_start+1):,:], phi_stm_leading_order[0,(vis_start+1):,:], phi_stm_ground_truth[0,(vis_start+1):,:]], curr_ts, "phi", [train_args["algo"], "leading_order", "ground_truth"])
+    Visualize_dyn_comp(TIMESTAMPS[(vis_start+1):], [phi_dot_stm_algo[0,vis_start:,:], phi_dot_stm_leading_order[0,vis_start:,:], phi_dot_stm_ground_truth[0,vis_start:,:]], curr_ts, "phi_dot", [train_args["algo"], "leading_order", "ground_truth"])
+else:
+    Visualize_dyn_comp(TIMESTAMPS[(vis_start+1):], [phi_stm_algo[0,(vis_start+1):,:], phi_stm_leading_order[0,(vis_start+1):,:]], curr_ts, "phi", [train_args["algo"], "leading_order"])
+    Visualize_dyn_comp(TIMESTAMPS[(vis_start+1):], [phi_dot_stm_algo[0,vis_start:,:], phi_dot_stm_leading_order[0,vis_start:,:]], curr_ts, "phi_dot", [train_args["algo"], "leading_order"])
 
 #Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_leading_order[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts, "phi", ["leading_order", "ground_truth"])
 #Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts, "phi_dot", ["leading_order", "ground_truth"])
@@ -627,4 +704,5 @@ Visualize_dyn_comp(TIMESTAMPS[(vis_start+1):], [phi_dot_stm_algo[0,vis_start:,:]
 write_logs([prev_ts, curr_ts], train_args)
 print(f"utility loss for {train_args['algo']}: {loss_eval_algo}")
 print(f"leading order loss: {loss_eval_leading_order}")
-print(f"ground truth loss: {loss_eval_ground_truth}")
+if cost == "quadratic":
+    print(f"ground truth loss: {loss_eval_ground_truth}")

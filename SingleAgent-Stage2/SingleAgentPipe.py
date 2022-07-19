@@ -286,27 +286,22 @@ class DynamicsFactory():
         phi_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device=DEVICE)
         phi_stm[:, 0, :] = S_OUTSTANDING / 2
         phi_dot_stm = torch.zeros((N_SAMPLE, T + 1, N_STOCK)).to(device=DEVICE)  # note here phi_dot has T+1 timesteps
-        curr_t = torch.ones((N_SAMPLE, 1))
+        curr_t = torch.ones((N_SAMPLE, 1)).to(device = DEVICE)
         phi_dot_stm[:, 0, :] = model((-1, curr_t)) #curr_t as dummy input
-        for t in range(T):
-            phi_stm[:, t + 1, :] = phi_stm[:, t, :] + phi_dot_stm[:, t, :] * TR / T
-            x = torch.cat((self.W_std[:, t, :], t / T * TR * curr_t), dim=1).to(device=DEVICE)
-            Z_stmd[:, t, :, :] = model((t, x)).reshape(N_SAMPLE, N_STOCK, N_BM)
-            """phi_dot_stm[:, t + 1, :] = phi_dot_stm[:, t, :] + \
-                                       +TR / T * GAMMA * torch.einsum("ij,bj -> bi", torch.mm(
-                torch.mm(torch.inverse(self.lam_mm), self.sigma_tmd[t, :, :]), self.sigma_tmd[t, :, :].T),
-                                                                      (phi_stm[:, t, :] - self.phi_stm_bar[:, t, :]))+\
-                +torch.einsum('bik, bk -> bi', Z_stmd[:, t, :, :], self.dW_std[:, t, :])"""
-
+        INV_LAMBDA_ON_100=torch.inverse(100*self.lam_mm)
+        for t in range(T):            
+            x = torch.cat((self.W_std[:, t, :], (t+1) / T * TR * curr_t), dim=1).to(device=DEVICE)
+            Z_stmd[:, t, :, :] = model((t, x)).reshape(N_SAMPLE, N_STOCK, N_BM) 
             phi_dot_stm[:, t + 1, :] = phi_dot_stm[:, t, :] + \
-                +TR / T * GAMMA * torch.einsum("bij,bj -> bi",
+                + 100*TR / T * GAMMA * torch.einsum("bij,bj -> bi",
                                                torch.einsum("bij,bkj -> bik",
                                                     torch.einsum("ji ,bik->bjk",
-                                                                 torch.inverse(self.lam_mm), self.sigma_stmd[:,t, :, :]),
-                                                            self.sigma_stmd[:,t, :, :]),
-                                                (phi_stm[:, t, :] - self.phi_stm_bar[:, t, :])
+                                                                INV_LAMBDA_ON_100, self.sigma_stmd[:,t, :, :]),
+                                                            self.sigma_stmd[:,t, :, :]) ,
+                                                (phi_stm[:, t, :] - self.phi_stm_bar[:, t, :]) 
                                                ) + \
-                +torch.einsum('bik, bk -> bi', Z_stmd[:, t, :, :], self.dW_std[:, t, :])
+                +torch.einsum('bik, bk -> bi', Z_stmd[:, t, :, :], self.dW_std[:, t, :])       
+            phi_stm[:, t + 1, :] = phi_stm[:, t, :] + phi_dot_stm[:, t+1, :] * TR / T
             """
             +TR / T * GAMMA * torch.einsum("ij,bj -> bi", torch.mm(torch.mm(torch.inverse(self.lam_mm), self.sigma_tmd[t, :, :]), self.sigma_tmd[t, :, :].T), phi_stm[:, t, :]) - TR / T * torch.matmul(torch.inverse(self.lam_mm), self.mu_tm[t, :]) + TR / T * GAMMA * torch.einsum("md,sd -> sm", torch.mm(torch.mm(torch.inverse(self.lam_mm), self.sigma_tmd[t, :, :]), self.xi_dd), self.W_std[:, t, :]) +\
             +TR/T*GAMMA*torch.einsum("ij,bj -> bi", torch.mm(torch.mm(torch.inverse(self.lam_mm), self.sigma_tmd[t, :, :]), self.sigma_tmd[t, :, :].T), (phi_stm[:, t, :]-self.phi_stm_bar[:, t, :]))
@@ -638,7 +633,7 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
         else:
             phi_dot_stm, phi_stm = dynamic_factory.fbsde_power(model)
         ### to match the dim
-        phi_dot_stm = phi_dot_stm[:,:-1,:]
+        phi_dot_stm = phi_dot_stm[:,1:,:]
     elif algo == "pasting":
         phi_dot_stm, phi_stm = dynamic_factory.pasting(model, pasting_cutoff)
     elif algo == "leading_order":

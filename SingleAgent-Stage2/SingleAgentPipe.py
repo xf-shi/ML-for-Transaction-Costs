@@ -756,7 +756,7 @@ train_args = {
     "solver": "Adam",
     "hidden_lst": [50, 50, 50],
     "lr": 1e-3,
-    "epoch": 10,#,20000,
+    "epoch": 20000,
     "decay": 0.1,
     "scheduler_step": 200000,
     "retrain": False,
@@ -766,7 +766,7 @@ train_args = {
 
 #curr_ts = "test"
 
-model, loss_arr, prev_ts, curr_ts, train_args = transfer_learning(train_args, N_rounds = 3, n_train = 2, n_sample_lst = [128, 500], lr_lst = [1e-2, 1e-3], epoch_lst = [10, 20])
+model, loss_arr, prev_ts, curr_ts, train_args = transfer_learning(train_args, N_rounds = 3, n_train = 2, n_sample_lst = [128, 500], lr_lst = [1e-3, 1e-4], epoch_lst = [20000, 20000])
 #model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
 model.eval()
 phi_dot_stm_algo, phi_stm_algo, loss_eval_algo = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0, pasting_cutoff = train_args["pasting_cutoff"])

@@ -416,7 +416,7 @@ class DynamicsFactory():
             phi_dot_stm_leading_order, phi_stm_leading_order = self.leading_order_quad(time_len = M)
         else:
             phi_dot_stm_leading_order, phi_stm_leading_order = self.leading_order_power(POWER, time_len = M)
-        print(phi_stm_leading_order[0,-1,:])
+#        print(phi_stm_leading_order[0,-1,:])
         phi_dot_stm_deep_hedging, phi_stm_deep_hedging = self.deep_hedging(model, time_len = T - M, phi_0 = phi_stm_leading_order[:,-1,:].data, start_t = M)
         phi_dot_stm[:,:M,:] += phi_dot_stm_leading_order
         phi_stm[:,:(M+1),:] += phi_stm_leading_order
@@ -434,14 +434,16 @@ class LossFactory():
         self.mse_loss_func=torch.nn.MSELoss()
 
     ## TODO: Implement it -- Zhanhao Zhang
-    def utility_loss(self, phi_dot_stm, phi_stm, power):
+    def utility_loss(self, phi_dot_stm, phi_stm, power, is_arr = False):
         if power == 2:
             loss_mat = torch.einsum("ijk, ijk -> ij", phi_stm[:,1:,:], self.mu_stm) - GAMMA / 2 * torch.einsum("ijk -> ij", (torch.einsum("ijk, ijkl -> ijl", phi_stm[:,1:,:], self.sigma_stmd) + torch.einsum("ijk, kl -> ijl", self.W_std[:,1:,:], self.xi_dd)) ** 2) - 1 / 2 * torch.einsum("ijk, lk, ijl -> ij", phi_dot_stm, self.lam_mm, phi_dot_stm)
-            loss_compact = -torch.sum(loss_mat / N_SAMPLE / T * TR) / TR
         else:
             ## Currently only support 1-dim.
             loss_mat = torch.einsum("ijk, ijk -> ij", phi_stm[:,1:,:], self.mu_stm) - GAMMA / 2 * torch.einsum("ijk -> ij", (torch.einsum("ijk, ijkl -> ijl", phi_stm[:,1:,:], self.sigma_stmd) + torch.einsum("ijk, kl -> ijl", self.W_std[:,1:,:], self.xi_dd)) ** 2) - 1 / power * torch.einsum("ijk, lk -> ij", torch.abs(phi_dot_stm) ** power, self.lam_mm)
+        if not is_arr:
             loss_compact = -torch.sum(loss_mat / N_SAMPLE / T * TR) / TR
+        else:
+            loss_compact = -torch.sum(loss_mat / N_SAMPLE / T * TR, axis = 0) / TR
         return loss_compact
     
     ## TODO: Implement it -- Zhanhao Zhang
@@ -625,7 +627,7 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         curr_ts = "test"
     return model, loss_arr, prev_ts, curr_ts
 
-def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "quadratic", visualize_obs = 0, pasting_cutoff = 0, phi_0 = None, W_s0d = None):
+def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "quadratic", visualize_obs = 0, pasting_cutoff = 0, phi_0 = None, W_s0d = None, is_arr = False):
     assert algo in ["deep_hedging", "fbsde", "pasting", "leading_order", "ground_truth"]
     assert cost in ["quadratic", "power"]
     if cost == "quadratic":
@@ -655,14 +657,64 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
         assert cost == "quadratic"
         phi_dot_stm, phi_stm = dynamic_factory.ground_truth(model, phi_0 = phi_0)
     loss_factory = LossFactory(time_lst, dW_std, W_s0d)
-    loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power)
+    loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power, is_arr = is_arr)
+    if not is_arr:
+        loss = float(loss.data)
     
 #    Visualize_dyn(TIMESTAMPS[1:], phi_stm[0,1:,:], curr_ts, "phi")
 #    Visualize_dyn(TIMESTAMPS[1:], phi_dot_stm[0,:,:], curr_ts, "phi_dot")
 #    Visualize_dyn(TIMESTAMPS[1:], sigma_stmd, curr_ts, "sigma")
 #    Visualize_dyn(TIMESTAMPS[1:], mu_stm, curr_ts, "mu")
 #    Visualize_dyn(TIMESTAMPS[1:], s_tm, curr_ts, "s")
-    return phi_dot_stm, phi_stm, float(loss.data)
+    return phi_dot_stm, phi_stm, loss
+
+def transfer_learning(train_args, N_rounds = 5):
+    if POWER == 2:
+        cost = "quadratic"
+    else:
+        cost = "power"
+    
+    final_ts = datetime.now(tz=pytz.timezone("America/New_York")).strftime("%Y-%m-%d-%H-%M-%S")
+    
+    phi_dot_stm_leading_order, phi_stm_leading_order, loss_eval_leading_order = evaluation(dW_STD, final_ts, None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0, is_arr = True)
+    if cost == "quadratic":
+        phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_eval_ground_truth = evaluation(dW_STD, final_ts, None, algo = "ground_truth", cost = train_args["cost"], visualize_obs = 0)
+    
+    log_dir = None
+    init_ts = None
+    for i in range(N_rounds):
+        model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
+        if i == 0:
+            log_dir = f"{drive_dir}/transfer_log_{curr_ts}.txt"
+            init_ts = prev_ts
+        model.eval()
+        phi_dot_stm_algo, phi_stm_algo, loss_eval_algo = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0, pasting_cutoff = train_args["pasting_cutoff"], is_arr = True)
+        
+        ## Write Logs
+        with open(log_dir, "a") as f:
+            f.write(f"Current Cutoff: {train_args['pasting_cutoff']}/{T}\n")
+            f.write(f"\tUtility Loss: {float(torch.sum(loss_eval_algo))}\n")
+        
+        ## Modify pasting cutoff
+        loss_diff = np.cumsum((loss_eval_algo - loss_eval_leading_order).data.numpy()[::-1])[::-1]
+        loss_idx = loss_diff < 0
+        pos = int(np.argmax(loss_idx))
+        if pos == 0 and loss_idx[0] == 0:
+            pos = max(0, T - (T - train_args["pasting_cutoff"]) * 2)
+        else:
+            pos = train_args["pasting_cutoff"] + pos
+        if i < N_rounds - 1:
+            train_args["pasting_cutoff"] = pos
+            train_args["retrain"] = True
+    
+    ## Write Logs
+    with open(log_dir, "a") as f:
+        f.write("\n")
+        f.write(f"leading order loss: {float(torch.sum(loss_eval_leading_order))}\n")
+        if cost == "quadratic":
+            f.write(f"ground truth loss: {loss_eval_ground_truth}\n")
+        
+    return model, loss_arr, init_ts, final_ts, train_args
 
 if POWER == 2:
     cost = "quadratic"
@@ -676,7 +728,7 @@ train_args = {
     "model_name": "discretized_feedforward",
     "solver": "Adam",
     "hidden_lst": [50, 50, 50],
-    "lr": 1e-4,
+    "lr": 1e-3,
     "epoch": 20000,
     "decay": 0.1,
     "scheduler_step": 200000,
@@ -686,7 +738,9 @@ train_args = {
 }
 
 #curr_ts = "test"
-model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
+
+model, loss_arr, prev_ts, curr_ts, train_args = transfer_learning(train_args, N_rounds = 3)
+#model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
 model.eval()
 phi_dot_stm_algo, phi_stm_algo, loss_eval_algo = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0, pasting_cutoff = train_args["pasting_cutoff"])
 phi_dot_stm_leading_order, phi_stm_leading_order, loss_eval_leading_order = evaluation(dW_STD, curr_ts, None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0)

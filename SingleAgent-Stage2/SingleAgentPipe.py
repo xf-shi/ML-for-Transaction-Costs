@@ -21,7 +21,7 @@ import sys
 T = 2520 #5000 #
 TR = 2520 #???
 N_SAMPLE = 128
-POWER = 3/2 #2
+POWER = 2 #3/2
 N_STOCK = 1 # 3
 COEF_ = 1e12 # 1e11
 S_OUTSTANDING = torch.tensor([2.46]) * 1e11 / COEF_ #torch.tensor([1.15, 0.32, 0.23]) *1e10 / COEF_
@@ -180,6 +180,7 @@ class ModelFactory:
 
         if not retrain:
             self.model, self.prev_ts = self.load_latest()
+            print(self.prev_ts)
 
         if self.model is None:
             if model_name == "discretized_feedforward":
@@ -400,8 +401,9 @@ class DynamicsFactory():
         return phi_dot_stm, phi_stm
     
     ## TODO: Implement it -- Zhanhao Zhang
-    def random_deep_hedging(self, model, time_len = T):
-        phi_0 = S_OUTSTANDING / 2 #torch.tensor([0.0751]) #torch.tensor([0.1603, -0.7572,  1.5443]) #torch.rand(N_STOCK) * 2
+    def random_deep_hedging(self, model, time_len = T, phi_0 = None):
+        if phi_0 is None:
+            phi_0 = torch.tensor([0.0617]) #torch.tensor([0.1603, -0.7572,  1.5443]) #torch.rand(N_STOCK) * 2
         phi_dot_stm, phi_stm = self.deep_hedging(model, time_len = time_len, phi_0 = phi_0)
         return phi_dot_stm, phi_stm
     
@@ -414,7 +416,7 @@ class DynamicsFactory():
             phi_dot_stm_leading_order, phi_stm_leading_order = self.leading_order_quad(time_len = M)
         else:
             phi_dot_stm_leading_order, phi_stm_leading_order = self.leading_order_power(POWER, time_len = M)
-#        print(phi_stm_leading_order[:,-1,:])
+        print(phi_stm_leading_order[0,-1,:])
         phi_dot_stm_deep_hedging, phi_stm_deep_hedging = self.deep_hedging(model, time_len = T - M, phi_0 = phi_stm_leading_order[:,-1,:].data, start_t = M)
         phi_dot_stm[:,:M,:] += phi_dot_stm_leading_order
         phi_stm[:,:(M+1),:] += phi_stm_leading_order
@@ -462,7 +464,7 @@ def visualize_loss(loss_arr, ts, loss_truth):
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.axhline(y = loss_arr[-1], color = "red")
-    plt.title(f"Final Loss = {round(loss_arr[-1], 2)}, True Loss = {round(loss_truth, 2)}")
+    plt.title(f"Final Loss = {loss_arr[-1]:.2e}, True Loss = {loss_truth:.2e}")
     plt.savefig(f"{drive_dir}/Plots/loss_{ts}.png")
     plt.close()
 
@@ -536,6 +538,7 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         power = 3 / 2
     
     ## TODO: Change the input dimension accordingly
+    phi_0_leading = None
     if algo == "deep_hedging":
         output_dim = N_STOCK
         input_dim = N_BM + N_STOCK + 1
@@ -547,8 +550,15 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         input_dim = N_BM + N_STOCK + 1
     if algo == "pasting":
         multi_normal = MultivariateNormal(torch.zeros((N_SAMPLE, T - pasting_cutoff, N_BM)), BM_COV * TR / T)
-        multi_normal_0 = MultivariateNormal(torch.zeros((N_SAMPLE, N_BM)), BM_COV * pasting_cutoff / T * TR)
+        #multi_normal_0 = MultivariateNormal(torch.zeros((N_SAMPLE, N_BM)), BM_COV * pasting_cutoff / T * TR)
+        W_s0d = W_STD[:, pasting_cutoff + 1, :].reshape((N_SAMPLE, 1, N_BM)).cpu()
         time_lst = TIMESTAMPS[:(T - pasting_cutoff + 1)]
+        dynamic_factory = DynamicsFactory(TIMESTAMPS, dW_STD, None, g_dir = "eva.txt")
+        if cost == "quadratic":
+            phi_dot_stm_leading_order, phi_stm_leading_order = dynamic_factory.leading_order_quad()
+        else:
+            phi_dot_stm_leading_order, phi_stm_leading_order = dynamic_factory.leading_order_power(POWER)
+        phi_0_leading = phi_stm_leading_order[:, pasting_cutoff + 1,:]
     else:
         multi_normal = MULTI_NORMAL
         time_lst = TIMESTAMPS
@@ -561,10 +571,10 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         optimizer.zero_grad()
         ## TODO: Implement it
         dW_std = multi_normal.sample().to(device = DEVICE)
-        if algo == "pasting":
-            W_s0d = multi_normal_0.sample().to(device = DEVICE)
-        else:
-            W_s0d = None
+#         if algo == "pasting":
+#             W_s0d = multi_normal_0.sample().to(device = DEVICE)
+#         else:
+#             W_s0d = None
         dynamic_factory = DynamicsFactory(time_lst, dW_std, W_s0d, g_dir = "eva.txt")
         loss_factory = LossFactory(time_lst, dW_std, W_s0d)
 
@@ -578,7 +588,7 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
                 phi_dot_stm, phi_stm = dynamic_factory.fbsde_power(model)
             loss = loss_factory.fbsde_loss(phi_dot_stm, phi_stm)
         else: #if algo == "pasting":
-            phi_dot_stm, phi_stm = dynamic_factory.random_deep_hedging(model, T - pasting_cutoff)
+            phi_dot_stm, phi_stm = dynamic_factory.random_deep_hedging(model, T - pasting_cutoff, phi_0 = phi_0_leading)
             loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power)
         ## End here ##
         loss_arr.append(float(loss.data))
@@ -665,11 +675,11 @@ train_args = {
     "cost": cost,
     "model_name": "discretized_feedforward",
     "solver": "Adam",
-    "hidden_lst": [50],
-    "lr": 1e-3, #1e-4,
-    "epoch": 100,#10000,
+    "hidden_lst": [50, 50, 50],
+    "lr": 1e-4,
+    "epoch": 20000,
     "decay": 0.1,
-    "scheduler_step": 100000,
+    "scheduler_step": 200000,
     "retrain": False,
     "pasting_cutoff": 2400, #4800,
     "n_sample": N_SAMPLE

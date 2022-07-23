@@ -344,7 +344,7 @@ class DynamicsFactory():
     
     def g_vec(self, x):
         q = 3 / 2
-        x_ind = torch.round((x + 0) / 50 * 500000).long()
+        x_ind = torch.round((torch.abs(x) + 0) / 50 * 500000).long()
         x_inbound = (torch.abs(x) <= 50) + 0
         x_outbound = -torch.sign(x) * q * (q - 1) ** (-(q - 1) / q) * torch.abs(x) ** (2 * (q - 1) / q)
         return torch.sign(x) * self.G_MAP[x_ind * x_inbound] + x_outbound * (1 - x_inbound)

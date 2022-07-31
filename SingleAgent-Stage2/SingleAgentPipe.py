@@ -163,7 +163,7 @@ class ModelFull(nn.Module):
 
 ## Construct arbitrary neural network models with optimizer and scheduler
 class ModelFactory:
-    def __init__(self, algo, model_name, input_dim, hidden_lst, output_dim, lr, decay, scheduler_step, solver = "Adam", retrain = False, pasting_cutoff = 0):
+    def __init__(self, algo, model_name, input_dim, hidden_lst, output_dim, lr, decay, scheduler_step, solver = "Adam", retrain = False, pasting_cutoff = 0, pasting_T = None):
         assert solver in ["Adam", "SGD", "RMSprop"]
         assert model_name in ["discretized_feedforward", "rnn"]
         assert algo in ["deep_hedging", "fbsde", "pasting"]
@@ -179,6 +179,7 @@ class ModelFactory:
         self.prev_ts = None
         self.algo = algo
         self.pasting_cutoff = pasting_cutoff
+        self.pasting_T = pasting_T
 
         if not retrain:
             self.model, self.prev_ts = self.load_latest()
@@ -205,7 +206,10 @@ class ModelFactory:
     ## TODO: Implement it -- Zhanhao Zhang
     def discretized_feedforward(self):
         if self.algo == "pasting":
-            time_len = T - self.pasting_cutoff
+            if self.pasting_T is None:
+                time_len = T - self.pasting_cutoff
+            else:
+                time_len = self.pasting_T
         else:
             time_len = T
         model_list = nn.ModuleList()
@@ -263,6 +267,7 @@ class DynamicsFactory():
         self.alpha_mm_sq = self.alpha_md @ self.alpha_md.T
         self.const_mm = (GAMMA ** (1/2)) * self.mat_frac_pow(self.lam_mm_negHalf @ self.alpha_mm_sq @ self.lam_mm_negHalf, 1/2) #(GAMMA ** (1/2)) * self.lam_mm_negHalf @ self.mat_frac_pow(self.lam_mm_negHalf @ self.alpha_mm_sq @ self.lam_mm_negHalf, 1/2) @ self.lam_mm_half
         self.T = len(ts_lst) - 1
+        self.ts_lst = ts_lst
         self.sigma_stmm_sq = torch.einsum("sijk, silk -> sijl", self.sigma_stmd, self.sigma_stmd)
         self.sigma_stmm_sq_inv = torch.zeros((self.n_sample, self.T, N_STOCK, N_STOCK)).to(device = DEVICE)
         for s in range(self.n_sample):
@@ -283,7 +288,7 @@ class DynamicsFactory():
         return mat_ret
     
     ## TODO: Implement it -- Daran Xu
-    def fbsde_quad(self, model):
+    def fbsde_quad(self, model, dt = TR / T):
         # need (1 + T) models in total
         # model output should be
         Z_stmd = torch.zeros((self.n_sample, T, N_STOCK, N_BM)).to(device=DEVICE)
@@ -305,7 +310,7 @@ class DynamicsFactory():
                                                 (phi_stm[:, t, :] - self.phi_stm_bar[:, t, :]) 
                                                ) + \
                 +torch.einsum('bik, bk -> bi', Z_stmd[:, t, :, :], self.dW_std[:, t, :])       
-            phi_stm[:, t + 1, :] = phi_stm[:, t, :] + phi_dot_stm[:, t+1, :] * TR / T
+            phi_stm[:, t + 1, :] = phi_stm[:, t, :] + phi_dot_stm[:, t+1, :] * (self.ts_lst[t + 1] - self.ts_lst[t])
             """
             +TR / T * GAMMA * torch.einsum("ij,bj -> bi", torch.mm(torch.mm(torch.inverse(self.lam_mm), self.sigma_tmd[t, :, :]), self.sigma_tmd[t, :, :].T), phi_stm[:, t, :]) - TR / T * torch.matmul(torch.inverse(self.lam_mm), self.mu_tm[t, :]) + TR / T * GAMMA * torch.einsum("md,sd -> sm", torch.mm(torch.mm(torch.inverse(self.lam_mm), self.sigma_tmd[t, :, :]), self.xi_dd), self.W_std[:, t, :]) +\
             +TR/T*GAMMA*torch.einsum("ij,bj -> bi", torch.mm(torch.mm(torch.inverse(self.lam_mm), self.sigma_tmd[t, :, :]), self.sigma_tmd[t, :, :].T), (phi_stm[:, t, :]-self.phi_stm_bar[:, t, :]))
@@ -328,7 +333,7 @@ class DynamicsFactory():
         pass
     
     ## TODO: Implement it -- Zhanhao Zhang
-    def leading_order_quad(self, model = None, time_len = None, phi_0 = None):
+    def leading_order_quad(self, model = None, time_len = None, phi_0 = None, dt = TR / T):
         if time_len is None:
             time_len = self.T
         phi_stm = torch.zeros((self.n_sample, time_len + 1, N_STOCK)).to(device = DEVICE)
@@ -339,7 +344,7 @@ class DynamicsFactory():
         phi_dot_stm = torch.zeros((self.n_sample, time_len, N_STOCK)).to(device = DEVICE)
         for t in range(time_len):
             phi_dot_stm[:,t,:] = -(phi_stm[:,t,:] - self.phi_stm_bar[:,t,:]) @ self.lam_mm_negHalf @ self.const_mm @ self.lam_mm_half
-            phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] / T * TR
+            phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] * (self.ts_lst[t + 1] - self.ts_lst[t])
         return phi_dot_stm, phi_stm
     
     def g_vec(self, x):
@@ -350,7 +355,7 @@ class DynamicsFactory():
         return torch.sign(x) * self.G_MAP[x_ind * x_inbound] + x_outbound * (1 - x_inbound)
     
     ## TODO: Implement it -- Zhanhao Zhang
-    def leading_order_power(self, power, model = None, time_len = None, phi_0 = None):
+    def leading_order_power(self, power, model = None, time_len = None, phi_0 = None, dt = TR / T):
         # Currently only support 1-dim
         if time_len is None:
             time_len = self.T
@@ -365,11 +370,11 @@ class DynamicsFactory():
             outer = -torch.sign(phi_sm_minus_bar) * (power * GAMMA * torch.sum(self.xi_dd) ** 4 / 8 / torch.sum(self.lam_mm) / torch.sum(self.alpha_md) ** 2) ** (1 / (power + 2))
             inner = 2 ** ((power - 1) / (power + 2)) * ((power * GAMMA * torch.sum(self.alpha_md) ** 2 / torch.sum(self.lam_mm)) ** (1 / (power + 2))) * ((torch.sum(self.alpha_md) / torch.sum(self.xi_dd)) ** (2 * power / (power + 2))) * phi_sm_minus_bar
             phi_dot_stm[:,t,:] = outer * torch.abs(self.g_vec(inner) / power)
-            phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] / T * TR
+            phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] * (self.ts_lst[t + 1] - self.ts_lst[t])
         return phi_dot_stm, phi_stm
     
     ## TODO: Implement it -- Zhanhao Zhang
-    def ground_truth(self, model = None, phi_0 = None):
+    def ground_truth(self, model = None, phi_0 = None, dt = TR / T):
         phi_stm = torch.zeros((self.n_sample, self.T + 1, N_STOCK)).to(device = DEVICE)
         if phi_0 is None:
             phi_stm[:,0,:] = S_OUTSTANDING / 2
@@ -384,11 +389,11 @@ class DynamicsFactory():
             tanh_exp_neg = torch.matmul(evecs, torch.matmul(torch.diag(torch.exp(evals[:,0] / norm_fac * (1 - 2 * norm_fac))), torch.inverse(evecs)))
             tanh_tmp = torch.inverse(tanh_exp_neg + tanh_exp) @ (tanh_exp - tanh_exp_neg) #1 - 2 * torch.inverse(tanh_exp + 1)
             phi_dot_stm[:,t,:] = -(phi_stm[:,t,:] - self.phi_stm_bar[:,t,:]) @ self.lam_mm_negHalf @ self.const_mm @ self.lam_mm_half @ tanh_tmp #torch.tanh(self.const_mm * (T - t) / T * TR).T
-            phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] / T * TR
+            phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] * (self.ts_lst[t + 1] - self.ts_lst[t])
         return phi_dot_stm, phi_stm
     
     ## TODO: Implement it -- Zhanhao Zhang
-    def deep_hedging(self, model, time_len = T, phi_0 = None, start_t = 0):
+    def deep_hedging(self, model, time_len = T, phi_0 = None, start_t = 0, dt = TR / T):
         phi_stm = torch.zeros((self.n_sample, time_len + 1, N_STOCK)).to(device = DEVICE)
         if phi_0 is None:
             phi_stm[:,0,:] = S_OUTSTANDING / 2
@@ -400,31 +405,37 @@ class DynamicsFactory():
             x = torch.cat((phi_stm[:,t,:], self.W_std[:,t + start_t,:], curr_t), dim = 1)#.to(device = DEVICE)
             phi_dot_stm[:,t,:] = model((t, x))
 #            phi_dot_stm[:,t,-1] = -torch.sum(phi_dot_stm[:,t,:-1])
-            phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] / T * TR
+            phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] * (self.ts_lst[t + start_t + 1] - self.ts_lst[t + start_t])
         return phi_dot_stm, phi_stm
     
     ## TODO: Implement it -- Zhanhao Zhang
-    def random_deep_hedging(self, model, time_len = T, phi_0 = None):
+    def random_deep_hedging(self, model, time_len = T, phi_0 = None, dt = TR / T):
         if phi_0 is None:
             phi_0 = torch.tensor([0.0617]) #torch.tensor([0.1603, -0.7572,  1.5443]) #torch.rand(N_STOCK) * 2
-        phi_dot_stm, phi_stm = self.deep_hedging(model, time_len = time_len, phi_0 = phi_0)
+        phi_dot_stm, phi_stm = self.deep_hedging(model, time_len = time_len, phi_0 = phi_0, dt = dt)
         return phi_dot_stm, phi_stm
     
     ## TODO: Implement it -- Zhanhao Zhang
-    def pasting(self, model, M):
-        phi_stm = torch.zeros((self.n_sample, T + 1, N_STOCK)).to(device = DEVICE)
-#         phi_stm[:,0,:] = S_OUTSTANDING / 2
-        phi_dot_stm = torch.zeros((self.n_sample, T, N_STOCK)).to(device = DEVICE)
+    def pasting(self, model, M, dt = TR / T, pasting_T = None):
+#        phi_stm = torch.zeros((self.n_sample, T + 1, N_STOCK)).to(device = DEVICE)
+##         phi_stm[:,0,:] = S_OUTSTANDING / 2
+#        phi_dot_stm = torch.zeros((self.n_sample, T, N_STOCK)).to(device = DEVICE)
         if POWER == 2:
             phi_dot_stm_leading_order, phi_stm_leading_order = self.leading_order_quad(time_len = M)
         else:
             phi_dot_stm_leading_order, phi_stm_leading_order = self.leading_order_power(POWER, time_len = M)
 #        print(phi_stm_leading_order[0,-1,:])
-        phi_dot_stm_deep_hedging, phi_stm_deep_hedging = self.deep_hedging(model, time_len = T - M, phi_0 = phi_stm_leading_order[:,-1,:].data, start_t = M)
-        phi_dot_stm[:,:M,:] += phi_dot_stm_leading_order
-        phi_stm[:,:(M+1),:] += phi_stm_leading_order
-        phi_dot_stm[:,M:,:] += phi_dot_stm_deep_hedging
-        phi_stm[:,(M+1):,:] += phi_stm_deep_hedging[:,1:,:]
+        if pasting_T is None:
+            time_len = T - M
+        else:
+            time_len = pasting_T
+        phi_dot_stm_deep_hedging, phi_stm_deep_hedging = self.deep_hedging(model, time_len = time_len, phi_0 = phi_stm_leading_order[:,-1,:].data, start_t = M, dt = dt)
+#        phi_dot_stm[:,:M,:] += phi_dot_stm_leading_order
+#        phi_stm[:,:(M+1),:] += phi_stm_leading_order
+#        phi_dot_stm[:,M:,:] += phi_dot_stm_deep_hedging
+#        phi_stm[:,(M+1):,:] += phi_stm_deep_hedging[:,1:,:]
+        phi_dot_stm = torch.cat((phi_dot_stm_leading_order, phi_dot_stm_deep_hedging), dim = 1)
+        phi_stm = torch.cat((phi_stm_leading_order, phi_stm_deep_hedging[:,1:,:]), dim = 1)
         return phi_dot_stm, phi_stm
 
 ## TODO: Implement it
@@ -433,6 +444,9 @@ class LossFactory():
     def __init__(self, ts_lst, dW_std, W_s0d = None):
         assert ts_lst[0] == 0
         self.dW_std = dW_std
+        self.ts_lst = ts_lst
+        self.dt_lst = self.ts_lst[1:] - self.ts_lst[:-1]
+        self.dt_lst = torch.tensor(self.dt_lst).reshape((len(self.dt_lst), 1)).float()
         self.W_std, self.mu_stm, self.sigma_stmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m = get_constants(dW_std, W_s0d)
         self.n_sample = self.dW_std.shape[0]
         self.mse_loss_func=torch.nn.MSELoss()
@@ -445,9 +459,9 @@ class LossFactory():
             ## Currently only support 1-dim.
             loss_mat = torch.einsum("ijk, ijk -> ij", phi_stm[:,1:,:], self.mu_stm) - GAMMA / 2 * torch.einsum("ijk -> ij", (torch.einsum("ijk, ijkl -> ijl", phi_stm[:,1:,:], self.sigma_stmd) + torch.einsum("ijk, kl -> ijl", self.W_std[:,1:,:], self.xi_dd)) ** 2) - 1 / power * torch.einsum("ijk, lk -> ij", torch.abs(phi_dot_stm) ** power, self.lam_mm)
         if not is_arr:
-            loss_compact = -torch.sum(loss_mat / self.n_sample / T * TR) / TR
+            loss_compact = -torch.sum(torch.einsum("ij, jk -> ij", loss_mat / self.n_sample, self.dt_lst)) / TR
         else:
-            loss_compact = -torch.sum(loss_mat / self.n_sample / T * TR, axis = 0) / TR
+            loss_compact = -torch.sum(torch.einsum("ij, jk -> ij", loss_mat / self.n_sample, self.dt_lst), axis = 0) / TR
         return loss_compact
     
     ## TODO: Implement it -- Zhanhao Zhang
@@ -469,7 +483,7 @@ def visualize_loss(loss_arr, ts, loss_truth):
     plt.plot(loss_arr)
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
-    plt.axhline(y = loss_arr[-1], color = "red")
+    plt.axhline(y = loss_truth, color = "red")
     plt.title(f"Final Loss = {loss_arr[-1]:.2e}, True Loss = {loss_truth:.2e}")
     plt.savefig(f"{drive_dir}/Plots/loss_{ts}.png")
     plt.close()
@@ -532,7 +546,7 @@ def Visualize_dyn_comp(timestamps, arr_lst, ts, name, algo_lst):
     plt.close()
 
 ## The training pipeline
-def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "discretized_feedforward", solver = "Adam", hidden_lst = [50], lr = 1e-2, epoch = 1000, decay = 0.1, scheduler_step = 10000, retrain = False, pasting_cutoff = 0, n_sample = N_SAMPLE, **kargs):
+def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "discretized_feedforward", solver = "Adam", hidden_lst = [50], lr = 1e-2, epoch = 1000, decay = 0.1, scheduler_step = 10000, retrain = False, pasting_cutoff = 0, n_sample = N_SAMPLE, pasting_T = None, **kargs):
     assert algo in ["deep_hedging", "fbsde", "pasting"]
     assert cost in ["quadratic", "power"]
     assert model_name in ["discretized_feedforward", "rnn"]
@@ -555,19 +569,23 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         output_dim = N_STOCK
         input_dim = N_BM + N_STOCK + 1
     if algo == "pasting":
-        multi_normal = MultivariateNormal(torch.zeros((n_sample, T - pasting_cutoff, N_BM)), BM_COV * TR / T)
-        #multi_normal_0 = MultivariateNormal(torch.zeros((n_sample, N_BM)), BM_COV * pasting_cutoff / T * TR)
-        if n_sample != N_SAMPLE:
-            torch.manual_seed(0)
-            MULTI_NORMAL_CURR = MultivariateNormal(torch.zeros((n_sample, T, N_BM)), BM_COV * TR / T)
-            dW_STD_curr = MULTI_NORMAL_CURR.sample().to(device = DEVICE)
-            W_STD_curr, _, _, _, _, _, _, _ = get_constants(dW_STD_curr)
-        else:
-            dW_STD_curr, W_STD_curr = dW_STD, W_STD
+#        multi_normal = MultivariateNormal(torch.zeros((n_sample, T - pasting_cutoff, N_BM)), BM_COV * TR / T)
+        dt = (T - pasting_cutoff) / T * TR / pasting_T
+        multi_normal = MultivariateNormal(torch.zeros((n_sample, pasting_T, N_BM)), BM_COV * dt)
+#        if n_sample != N_SAMPLE:
+        torch.manual_seed(0)
+        MULTI_NORMAL_CURR = MultivariateNormal(torch.zeros((n_sample, T, N_BM)), BM_COV * TR / T)
+        dW_STD_curr = MULTI_NORMAL_CURR.sample().to(device = DEVICE)
+        W_STD_curr, _, _, _, _, _, _, _ = get_constants(dW_STD_curr)
+#        else:
+#            dW_STD_curr, W_STD_curr = dW_STD, W_STD
 
         W_s0d = W_STD_curr[:, pasting_cutoff + 1, :].reshape((n_sample, 1, N_BM)).cpu()
         
-        time_lst = TIMESTAMPS[:(T - pasting_cutoff + 1)]
+        if pasting_T is None:
+            time_lst = TIMESTAMPS[:(T - pasting_cutoff + 1)]
+        else:
+            time_lst = np.linspace(0, (T - pasting_cutoff) / T * TR, pasting_T + 1)
         dynamic_factory = DynamicsFactory(TIMESTAMPS, dW_STD_curr, None, g_dir = "eva.txt")
         if cost == "quadratic":
             phi_dot_stm_leading_order, phi_stm_leading_order = dynamic_factory.leading_order_quad()
@@ -577,7 +595,7 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
     else:
         multi_normal = MULTI_NORMAL
         time_lst = TIMESTAMPS
-    model_factory = ModelFactory(algo, model_name, input_dim, hidden_lst, output_dim, lr, decay, scheduler_step, solver, retrain, pasting_cutoff)
+    model_factory = ModelFactory(algo, model_name, input_dim, hidden_lst, output_dim, lr, decay, scheduler_step, solver, retrain, pasting_cutoff, pasting_T)
 
     model, optimizer, scheduler, prev_ts = model_factory.prepare_model()
     loss_arr = []
@@ -603,7 +621,7 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
                 phi_dot_stm, phi_stm = dynamic_factory.fbsde_power(model)
             loss = loss_factory.fbsde_loss(phi_dot_stm, phi_stm)
         else: #if algo == "pasting":
-            phi_dot_stm, phi_stm = dynamic_factory.random_deep_hedging(model, T - pasting_cutoff, phi_0 = phi_0_leading)
+            phi_dot_stm, phi_stm = dynamic_factory.random_deep_hedging(model, pasting_T, phi_0 = phi_0_leading, dt = dt)
             loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power)
         ## End here ##
         loss_arr.append(float(loss.data))
@@ -640,36 +658,44 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         curr_ts = "test"
     return model, loss_arr, prev_ts, curr_ts
 
-def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "quadratic", visualize_obs = 0, pasting_cutoff = 0, phi_0 = None, W_s0d = None, is_arr = False):
+def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "quadratic", visualize_obs = 0, pasting_cutoff = 0, phi_0 = None, W_s0d = None, is_arr = False, pasting_T = None):
     assert algo in ["deep_hedging", "fbsde", "pasting", "leading_order", "ground_truth"]
     assert cost in ["quadratic", "power"]
     if cost == "quadratic":
         power = 2
     else:
         power = 3 / 2
-    time_lst = TIMESTAMPS[:(dW_std.shape[1] + 1)]
+    if pasting_T is None:
+        time_lst = TIMESTAMPS[:(dW_std.shape[1] + 1)]
+    else:
+        time_lst = get_ts(pasting_cutoff, pasting_T)
     dynamic_factory = DynamicsFactory(time_lst, dW_std, W_s0d, g_dir = "eva.txt")
     W_std, mu_stm, sigma_stmd, s_tm, xi_dd, lam_mm, alpha_md, beta_m = dynamic_factory.get_constant_processes()
+    if pasting_T is not None:
+        dt = (T - pasting_cutoff) / T * TR / pasting_T
+    else:
+        dt = TR / T
     if algo == "deep_hedging":
-        phi_dot_stm, phi_stm = dynamic_factory.deep_hedging(model, phi_0 = phi_0)
+        phi_dot_stm, phi_stm = dynamic_factory.deep_hedging(model, phi_0 = phi_0, dt = dt)
     elif algo == "fbsde":
         if cost == "quadratic":
-            phi_dot_stm, phi_stm = dynamic_factory.fbsde_quad(model)
+            phi_dot_stm, phi_stm = dynamic_factory.fbsde_quad(model, dt = dt)
         else:
-            phi_dot_stm, phi_stm = dynamic_factory.fbsde_power(model)
+            phi_dot_stm, phi_stm = dynamic_factory.fbsde_power(model, dt = dt)
         ### to match the dim
         phi_dot_stm = phi_dot_stm[:,1:,:]
     elif algo == "pasting":
-        phi_dot_stm, phi_stm = dynamic_factory.pasting(model, pasting_cutoff)
+        phi_dot_stm, phi_stm = dynamic_factory.pasting(model, pasting_cutoff, dt = dt, pasting_T = pasting_T)
     elif algo == "leading_order":
         if cost == "quadratic":
-            phi_dot_stm, phi_stm = dynamic_factory.leading_order_quad(model, phi_0 = phi_0)
+            phi_dot_stm, phi_stm = dynamic_factory.leading_order_quad(model, phi_0 = phi_0, dt = dt)
         else:
-            phi_dot_stm, phi_stm = dynamic_factory.leading_order_power(POWER, model)
+            phi_dot_stm, phi_stm = dynamic_factory.leading_order_power(POWER, model, dt = dt)
     else:
         assert cost == "quadratic"
-        phi_dot_stm, phi_stm = dynamic_factory.ground_truth(model, phi_0 = phi_0)
+        phi_dot_stm, phi_stm = dynamic_factory.ground_truth(model, phi_0 = phi_0, dt = dt)
     loss_factory = LossFactory(time_lst, dW_std, W_s0d)
+#    print(phi_dot_stm.shape, phi_stm.shape)
     loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power, is_arr = is_arr)
     if not is_arr:
         loss = float(loss.data)
@@ -681,6 +707,21 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
 #    Visualize_dyn(TIMESTAMPS[1:], s_tm, curr_ts, "s")
     return phi_dot_stm, phi_stm, loss
 
+def get_dW(pasting_cutoff, pasting_T, n_sample, dW_orig = dW_STD, seed = None):
+    dt = (T - pasting_cutoff) / T * TR / pasting_T
+    if seed is not None:
+        torch.manual_seed(seed)
+    multi_normal = MultivariateNormal(torch.zeros((n_sample, pasting_T, N_BM)), BM_COV * dt)
+    dW_STD_curr = multi_normal.sample().to(device = DEVICE)
+    dW_STD_transfer = torch.cat((dW_orig[:,:pasting_cutoff,:], dW_STD_curr), dim = 1)
+    return dW_STD_transfer
+
+def get_ts(pasting_cutoff, pasting_T):
+    dt = (T - pasting_cutoff) / T * TR / pasting_T
+    ts_fst = TIMESTAMPS[:(pasting_cutoff + 1)]
+    ts_sec = [float(ts_fst[-1]) + dt * (i + 1) for i in range(pasting_T)]
+    return np.array(list(ts_fst) + list(ts_sec))
+
 def transfer_learning(train_args, N_rounds = 5, n_train = 1, n_sample_lst = [128, 128], lr_lst = [1e-3, 1e-4], epoch_lst = [20000, 20000]):
     if POWER == 2:
         cost = "quadratic"
@@ -688,10 +729,6 @@ def transfer_learning(train_args, N_rounds = 5, n_train = 1, n_sample_lst = [128
         cost = "power"
     
     final_ts = datetime.now(tz=pytz.timezone("America/New_York")).strftime("%Y-%m-%d-%H-%M-%S")
-    
-    phi_dot_stm_leading_order, phi_stm_leading_order, loss_eval_leading_order = evaluation(dW_STD, final_ts, None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0, is_arr = True)
-    if cost == "quadratic":
-        phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_eval_ground_truth = evaluation(dW_STD, final_ts, None, algo = "ground_truth", cost = train_args["cost"], visualize_obs = 0)
     
     log_dir = None
     init_ts = None
@@ -701,6 +738,16 @@ def transfer_learning(train_args, N_rounds = 5, n_train = 1, n_sample_lst = [128
         print(f"Round #{i+1}:")
         with open(log_dir, "a") as f:
             f.write(f"Round #{i+1}/{N_rounds} - Cutoff: {train_args['pasting_cutoff']}/{T}\n")
+        
+        ## Reset dW based on pasting_T
+        ## TODO: MODIFY IT!!!
+        dW_STD_transfer = get_dW(train_args["pasting_cutoff"], train_args["pasting_T"], N_SAMPLE, dW_orig = dW_STD, seed = 0)
+        
+        phi_dot_stm_leading_order, phi_stm_leading_order, loss_eval_leading_order = evaluation(dW_STD_transfer, final_ts, None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0, is_arr = True, pasting_cutoff = train_args["pasting_cutoff"], pasting_T = train_args["pasting_T"])
+        if cost == "quadratic":
+            phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_eval_ground_truth = evaluation(dW_STD_transfer, final_ts, None, algo = "ground_truth", cost = train_args["cost"], visualize_obs = 0, pasting_cutoff = train_args["pasting_cutoff"], pasting_T = train_args["pasting_T"])
+            
+        ## Begin Training
         for j in range(n_train):
             if len(n_sample_lst) > 0:
                 train_args["n_sample"] = n_sample_lst[min(j, len(n_sample_lst) - 1)]
@@ -713,7 +760,7 @@ def transfer_learning(train_args, N_rounds = 5, n_train = 1, n_sample_lst = [128
             if i == 0 and j == 0:
                 init_ts = prev_ts
             model.eval()
-            phi_dot_stm_algo, phi_stm_algo, loss_eval_algo = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0, pasting_cutoff = train_args["pasting_cutoff"], is_arr = True)
+            phi_dot_stm_algo, phi_stm_algo, loss_eval_algo = evaluation(dW_STD_transfer, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0, pasting_cutoff = train_args["pasting_cutoff"], is_arr = True, pasting_T = train_args["pasting_T"])
         
             ## Write Logs
             with open(log_dir, "a") as f:
@@ -722,16 +769,23 @@ def transfer_learning(train_args, N_rounds = 5, n_train = 1, n_sample_lst = [128
         ## Modify pasting cutoff
         loss_diff = np.cumsum((loss_eval_algo - loss_eval_leading_order).data.numpy()[::-1])[::-1]
         loss_idx = loss_diff < 0
+        ## TODO: MODIFY IT!!!
         pos = int(np.argmax(loss_idx))
+        ts_lst = get_ts(train_args["pasting_cutoff"], train_args["pasting_T"])
+        ts_pos = ts_lst[(train_args["pasting_cutoff"] + 1):][pos]
+        pos = int(np.argmin(np.abs(ts_lst - ts_pos)) - 1 - train_args["pasting_cutoff"])
         if pos == 0 and loss_idx[0] == 0:
-            pos = max(0, T - (T - train_args["pasting_cutoff"]) * 2)
+            print("Not Enough Training!")
+            pos = train_args["pasting_cutoff"] + pos
+#            assert False
+            #pos = max(0, T - (T - train_args["pasting_cutoff"]) * 2)
         else:
             pos = train_args["pasting_cutoff"] + pos
         if i < N_rounds - 1:
             train_args["pasting_cutoff"] = pos
             train_args["retrain"] = True
     
-    phi_dot_stm_algo, phi_stm_algo, loss_eval_algo = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0, pasting_cutoff = train_args["pasting_cutoff"], is_arr = False)
+    phi_dot_stm_algo, phi_stm_algo, loss_eval_algo = evaluation(dW_STD_transfer, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0, pasting_cutoff = train_args["pasting_cutoff"], is_arr = False, pasting_T = train_args["pasting_T"])
     ## Write Logs
     with open(log_dir, "a") as f:
         f.write("\n")
@@ -760,19 +814,25 @@ train_args = {
     "decay": 0.1,
     "scheduler_step": 200000,
     "retrain": False,
-    "pasting_cutoff": 2400, #4800,
+    "pasting_cutoff": 2480, #4800,
+    "pasting_T": 168, # None
     "n_sample": N_SAMPLE
 }
 
 #curr_ts = "test"
 
-model, loss_arr, prev_ts, curr_ts, train_args = transfer_learning(train_args, N_rounds = 3, n_train = 2, n_sample_lst = [128, 500], lr_lst = [1e-3, 1e-4], epoch_lst = [20000, 20000])
+model, loss_arr, prev_ts, curr_ts, train_args = transfer_learning(train_args, N_rounds = 3, n_train = 2, n_sample_lst = [128, 500], lr_lst = [1e-3, 1e-4], epoch_lst = [10, 10])
 #model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
 model.eval()
-phi_dot_stm_algo, phi_stm_algo, loss_eval_algo = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0, pasting_cutoff = train_args["pasting_cutoff"])
-phi_dot_stm_leading_order, phi_stm_leading_order, loss_eval_leading_order = evaluation(dW_STD, curr_ts, None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0)
+## TODO: Modify It!!!
+dW_STD_transfer = get_dW(train_args["pasting_cutoff"], train_args["pasting_T"], N_SAMPLE, dW_orig = dW_STD, seed = 0)
+TIMESTAMPS = get_ts(train_args["pasting_cutoff"], train_args["pasting_T"])
+
+## TODO: Modify It!!!
+phi_dot_stm_algo, phi_stm_algo, loss_eval_algo = evaluation(dW_STD_transfer, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0, pasting_cutoff = train_args["pasting_cutoff"], pasting_T = train_args["pasting_T"])
+phi_dot_stm_leading_order, phi_stm_leading_order, loss_eval_leading_order = evaluation(dW_STD_transfer, curr_ts, None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0, pasting_cutoff = train_args["pasting_cutoff"], pasting_T = train_args["pasting_T"])
 if cost == "quadratic":
-    phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_eval_ground_truth = evaluation(dW_STD, curr_ts, None, algo = "ground_truth", cost = train_args["cost"], visualize_obs = 0)
+    phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_eval_ground_truth = evaluation(dW_STD_transfer, curr_ts, None, algo = "ground_truth", cost = train_args["cost"], visualize_obs = 0, pasting_cutoff = train_args["pasting_cutoff"], pasting_T = train_args["pasting_T"])
 
 #Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_algo[0,1:,0], phi_stm_ground_truth[0,1:,0]], curr_ts, "phi", [train_args["algo"], "ground_truth"])
 #Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_algo[0,:,0], phi_dot_stm_ground_truth[0,:,0]], curr_ts, "phi_dot", [train_args["algo"], "ground_truth"])

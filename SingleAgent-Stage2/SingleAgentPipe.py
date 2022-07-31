@@ -446,6 +446,7 @@ class LossFactory():
         self.dW_std = dW_std
         self.ts_lst = ts_lst
         self.dt_lst = self.ts_lst[1:] - self.ts_lst[:-1]
+        self.TR = self.ts_lst[-1] - self.ts_lst[0]
         self.dt_lst = torch.tensor(self.dt_lst).reshape((len(self.dt_lst), 1)).float()
         self.W_std, self.mu_stm, self.sigma_stmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m = get_constants(dW_std, W_s0d)
         self.n_sample = self.dW_std.shape[0]
@@ -459,9 +460,9 @@ class LossFactory():
             ## Currently only support 1-dim.
             loss_mat = torch.einsum("ijk, ijk -> ij", phi_stm[:,1:,:], self.mu_stm) - GAMMA / 2 * torch.einsum("ijk -> ij", (torch.einsum("ijk, ijkl -> ijl", phi_stm[:,1:,:], self.sigma_stmd) + torch.einsum("ijk, kl -> ijl", self.W_std[:,1:,:], self.xi_dd)) ** 2) - 1 / power * torch.einsum("ijk, lk -> ij", torch.abs(phi_dot_stm) ** power, self.lam_mm)
         if not is_arr:
-            loss_compact = -torch.sum(torch.einsum("ij, jk -> ij", loss_mat / self.n_sample, self.dt_lst)) / TR
+            loss_compact = -torch.sum(torch.einsum("ij, jk -> ij", loss_mat / self.n_sample, self.dt_lst)) / self.TR
         else:
-            loss_compact = -torch.sum(torch.einsum("ij, jk -> ij", loss_mat / self.n_sample, self.dt_lst), axis = 0) / TR
+            loss_compact = -torch.sum(torch.einsum("ij, jk -> ij", loss_mat / self.n_sample, self.dt_lst), axis = 0) / self.TR
         return loss_compact
     
     ## TODO: Implement it -- Zhanhao Zhang
@@ -639,8 +640,8 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
 
         ## Compute Ground Truth
         if cost == "quadratic":
-            phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_truth = evaluation(dW_std, curr_ts, None, algo = "ground_truth", cost = cost, visualize_obs = 0, phi_0 = phi_stm[:,0,:], W_s0d = W_s0d)
-        phi_dot_stm_leading_order, phi_stm_leading_order, loss_leading_order = evaluation(dW_std, curr_ts, None, algo = "leading_order", cost = cost, visualize_obs = 0, phi_0 = phi_stm[:,0,:], W_s0d = W_s0d)
+            phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_truth = evaluation(dW_std, curr_ts, None, algo = "ground_truth", cost = cost, visualize_obs = 0, phi_0 = phi_stm[:,0,:], W_s0d = W_s0d, time_lst = time_lst)
+        phi_dot_stm_leading_order, phi_stm_leading_order, loss_leading_order = evaluation(dW_std, curr_ts, None, algo = "leading_order", cost = cost, visualize_obs = 0, phi_0 = phi_stm[:,0,:], W_s0d = W_s0d, time_lst = time_lst)
 
         ## Visualize loss and results
         if cost == "quadratic":
@@ -658,17 +659,18 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         curr_ts = "test"
     return model, loss_arr, prev_ts, curr_ts
 
-def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "quadratic", visualize_obs = 0, pasting_cutoff = 0, phi_0 = None, W_s0d = None, is_arr = False, pasting_T = None):
+def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "quadratic", visualize_obs = 0, pasting_cutoff = 0, phi_0 = None, W_s0d = None, is_arr = False, pasting_T = None, time_lst = None):
     assert algo in ["deep_hedging", "fbsde", "pasting", "leading_order", "ground_truth"]
     assert cost in ["quadratic", "power"]
     if cost == "quadratic":
         power = 2
     else:
         power = 3 / 2
-    if pasting_T is None:
-        time_lst = TIMESTAMPS[:(dW_std.shape[1] + 1)]
-    else:
-        time_lst = get_ts(pasting_cutoff, pasting_T)
+    if time_lst is None:
+        if pasting_T is None:
+            time_lst = TIMESTAMPS[:(dW_std.shape[1] + 1)]
+        else:
+            time_lst = get_ts(pasting_cutoff, pasting_T)
     dynamic_factory = DynamicsFactory(time_lst, dW_std, W_s0d, g_dir = "eva.txt")
     W_std, mu_stm, sigma_stmd, s_tm, xi_dd, lam_mm, alpha_md, beta_m = dynamic_factory.get_constant_processes()
     if pasting_T is not None:

@@ -270,9 +270,11 @@ class DynamicsFactory():
         self.ts_lst = ts_lst
         self.sigma_stmm_sq = torch.einsum("sijk, silk -> sijl", self.sigma_stmd, self.sigma_stmd)
         self.sigma_stmm_sq_inv = torch.zeros((self.n_sample, self.T, N_STOCK, N_STOCK)).to(device = DEVICE)
-        for s in range(self.n_sample):
-            for t in range(self.T):
-                self.sigma_stmm_sq_inv[s,t,:,:] = torch.inverse(self.sigma_stmm_sq[s,t,:,:]) #self.sigma_stmm_sq_inv[t,:,:] #
+        self.sigma_mm_sq_inv = torch.inverse(self.sigma_stmm_sq[0,0,:,:])
+        self.sigma_stmm_sq_inv += self.sigma_mm_sq_inv
+#        for s in range(self.n_sample):
+#            for t in range(self.T):
+#                self.sigma_stmm_sq_inv[s,t,:,:] = torch.inverse(self.sigma_stmm_sq[s,t,:,:]) #self.sigma_stmm_sq_inv[t,:,:] #
         self.xi_std_w = torch.einsum("ijk, kl -> ijl", self.W_std[:,1:,:], self.xi_dd)
         self.phi_stm_bar = 1 / GAMMA * torch.einsum("sijk, sik -> sij", self.sigma_stmm_sq_inv, self.mu_stm) - torch.einsum("ijlk, ijk -> ijl", torch.einsum("sijk, sikl -> sijl", self.sigma_stmm_sq_inv, self.sigma_stmd), self.xi_std_w)
         if g_dir is not None:
@@ -447,7 +449,7 @@ class LossFactory():
         self.ts_lst = ts_lst
         self.dt_lst = self.ts_lst[1:] - self.ts_lst[:-1]
         self.TR = self.ts_lst[-1] - self.ts_lst[0]
-        self.dt_lst = torch.tensor(self.dt_lst).reshape((len(self.dt_lst), 1)).float()
+        self.dt_lst = torch.tensor(self.dt_lst).reshape((len(self.dt_lst), 1)).float().to(device=DEVICE)
         self.W_std, self.mu_stm, self.sigma_stmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m = get_constants(dW_std, W_s0d)
         self.n_sample = self.dW_std.shape[0]
         self.mse_loss_func=torch.nn.MSELoss()
@@ -769,7 +771,7 @@ def transfer_learning(train_args, N_rounds = 5, n_train = 1, n_sample_lst = [128
                 f.write(f"\tIteration #{j+1}/{n_train} - Utility Loss: {float(torch.sum(loss_eval_algo))}\n")
         
         ## Modify pasting cutoff
-        loss_diff = np.cumsum((loss_eval_algo - loss_eval_leading_order).data.numpy()[::-1])[::-1]
+        loss_diff = np.cumsum((loss_eval_algo - loss_eval_leading_order).cpu().data.numpy()[::-1])[::-1]
         loss_idx = loss_diff < 0
         ## TODO: MODIFY IT!!!
         pos = int(np.argmax(loss_idx))

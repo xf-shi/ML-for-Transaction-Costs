@@ -1,4 +1,4 @@
-drive_dir = "." #"drive/MyDrive/SingleAgent-Stage2"
+drive_dir = "." #"drive/MyDrive/CFRM/RL/SingleAgent-Stage2"
 
 import os
 import math
@@ -133,17 +133,17 @@ class Net(nn.Module):
         self.layer_lst = nn.ModuleList()
         self.bn = nn.ModuleList()
 
-        self.layer_lst.append(nn.Linear(INPUT_DIM, HIDDEN_DIM_LST[0]))
+        self.layer_lst.append(nn.Linear(INPUT_DIM, HIDDEN_DIM_LST[0], bias=False))
         self.bn.append(nn.BatchNorm1d(HIDDEN_DIM_LST[0],momentum=0.1))
         for i in range(1, len(HIDDEN_DIM_LST)):
-            self.layer_lst.append(nn.Linear(HIDDEN_DIM_LST[i - 1], HIDDEN_DIM_LST[i]))
+            self.layer_lst.append(nn.Linear(HIDDEN_DIM_LST[i - 1], HIDDEN_DIM_LST[i], bias=False))
             self.bn.append(nn.BatchNorm1d(HIDDEN_DIM_LST[i],momentum=0.1))
-        self.layer_lst.append(nn.Linear(HIDDEN_DIM_LST[-1], OUTPUT_DIM))
+        self.layer_lst.append(nn.Linear(HIDDEN_DIM_LST[-1], OUTPUT_DIM, bias=False))
 
     def forward(self, x):
         for i in range(len(self.layer_lst) - 1):
             x = self.layer_lst[i](x)
-            x = self.bn[i](x)
+#            x = self.bn[i](x)
             x = F.relu(x)
         return self.layer_lst[-1](x)
 
@@ -549,11 +549,13 @@ def Visualize_dyn_comp(timestamps, arr_lst, ts, name, algo_lst):
     plt.close()
 
 ## The training pipeline
-def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "discretized_feedforward", solver = "Adam", hidden_lst = [50], lr = 1e-2, epoch = 1000, decay = 0.1, scheduler_step = 10000, retrain = False, pasting_cutoff = 0, n_sample = N_SAMPLE, pasting_T = None, **kargs):
+def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "discretized_feedforward", solver = "Adam", hidden_lst = [50], lr = 1e-2, epoch = 1000, decay = 0.1, scheduler_step = 10000, retrain = False, pasting_cutoff = 0, n_sample = N_SAMPLE, pasting_T = None, train_freq = 1, train_cut = 10, **kargs):
     assert algo in ["deep_hedging", "fbsde", "pasting"]
     assert cost in ["quadratic", "power"]
     assert model_name in ["discretized_feedforward", "rnn"]
     assert solver in ["Adam", "SGD", "RMSprop"]
+    assert int(train_freq) >= 1
+    train_freq = int(train_freq)
     
     if cost == "quadratic":
         power = 2
@@ -577,24 +579,27 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         multi_normal = MultivariateNormal(torch.zeros((n_sample, pasting_T, N_BM)), BM_COV * dt)
 #        if n_sample != N_SAMPLE:
         torch.manual_seed(0)
-        MULTI_NORMAL_CURR = MultivariateNormal(torch.zeros((n_sample, T, N_BM)), BM_COV * TR / T)
-        dW_STD_curr = MULTI_NORMAL_CURR.sample().to(device = DEVICE)
-        W_STD_curr, _, _, _, _, _, _, _ = get_constants(dW_STD_curr)
-#        else:
-#            dW_STD_curr, W_STD_curr = dW_STD, W_STD
-
-        W_s0d = W_STD_curr[:, pasting_cutoff + 1, :].reshape((n_sample, 1, N_BM)).cpu()
-        
+        MULTI_NORMAL_CURR = MultivariateNormal(torch.zeros((n_sample, train_cut, N_BM)), BM_COV * TR / T)
+#        MULTI_NORMAL_CURR = MultivariateNormal(torch.zeros((n_sample, T, N_BM)), BM_COV * TR / T)
+#        dW_STD_curr = MULTI_NORMAL_CURR.sample().to(device = DEVICE)
+##        dW_STD_curr[:,:pasting_cutoff,:] = dW_STD_curr[0,:pasting_cutoff,:]
+#        W_STD_curr, _, _, _, _, _, _, _ = get_constants(dW_STD_curr)
+##        else:
+##            dW_STD_curr, W_STD_curr = dW_STD, W_STD
+#
+#        cut = min(train_cut, pasting_cutoff)
+#        W_s0d = W_STD_curr[:, cut + 1, :].reshape((n_sample, 1, N_BM)).cpu()
+#
         if pasting_T is None:
             time_lst = TIMESTAMPS[:(T - pasting_cutoff + 1)]
         else:
             time_lst = np.linspace(0, (T - pasting_cutoff) / T * TR, pasting_T + 1)
-        dynamic_factory = DynamicsFactory(TIMESTAMPS, dW_STD_curr, None, g_dir = "eva.txt")
-        if cost == "quadratic":
-            phi_dot_stm_leading_order, phi_stm_leading_order = dynamic_factory.leading_order_quad()
-        else:
-            phi_dot_stm_leading_order, phi_stm_leading_order = dynamic_factory.leading_order_power(POWER)
-        phi_0_leading = phi_stm_leading_order[:, pasting_cutoff + 1,:]
+#        dynamic_factory = DynamicsFactory(TIMESTAMPS, dW_STD_curr, None, g_dir = "eva.txt")
+#        if cost == "quadratic":
+#            phi_dot_stm_leading_order, phi_stm_leading_order = dynamic_factory.leading_order_quad()
+#        else:
+#            phi_dot_stm_leading_order, phi_stm_leading_order = dynamic_factory.leading_order_power(POWER)
+#        phi_0_leading = phi_stm_leading_order[:, cut + 1,:]
     else:
         multi_normal = MULTI_NORMAL
         time_lst = TIMESTAMPS
@@ -602,15 +607,26 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
 
     model, optimizer, scheduler, prev_ts = model_factory.prepare_model()
     loss_arr = []
+    loss_tmp = torch.tensor(0.).to(device=DEVICE)
     
     for itr in tqdm(range(epoch)):
         optimizer.zero_grad()
         ## TODO: Implement it
         dW_std = multi_normal.sample().to(device = DEVICE)
-#         if algo == "pasting":
-#             W_s0d = multi_normal_0.sample().to(device = DEVICE)
-#         else:
-#             W_s0d = None
+        if algo == "pasting":
+            dW_STD_curr = MULTI_NORMAL_CURR.sample().to(device = DEVICE)
+            W_STD_curr, _, _, _, _, _, _, _ = get_constants(dW_STD_curr)
+            cut = min(train_cut, pasting_cutoff)
+            W_s0d = W_STD_curr[:, -1, :].reshape((n_sample, 1, N_BM)).cpu()
+            
+            dynamic_factory2 = DynamicsFactory(TIMESTAMPS[:(train_cut + 1)], dW_STD_curr, None, g_dir = "eva.txt")
+            if cost == "quadratic":
+                phi_dot_stm_leading_order, phi_stm_leading_order = dynamic_factory2.leading_order_quad()
+            else:
+                phi_dot_stm_leading_order, phi_stm_leading_order = dynamic_factory2.leading_order_power(POWER)
+            phi_0_leading = phi_stm_leading_order[:, cut,:]
+        else:
+            W_s0d = None
         dynamic_factory = DynamicsFactory(time_lst, dW_std, W_s0d, g_dir = "eva.txt")
         loss_factory = LossFactory(time_lst, dW_std, W_s0d)
 
@@ -627,13 +643,17 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
             phi_dot_stm, phi_stm = dynamic_factory.random_deep_hedging(model, pasting_T, phi_0 = phi_0_leading, dt = dt)
             loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power)
         ## End here ##
-        loss_arr.append(float(loss.data))
-        loss.backward()
+        loss_tmp += loss / train_freq
+        if itr % train_freq == train_freq - 1:
+            loss_arr.append(float(loss_tmp.data))
+            loss_tmp.backward()
 
-        if torch.isnan(loss.data):
-            break
-        optimizer.step()
-        scheduler.step()
+            if torch.isnan(loss_tmp.data):
+                break
+            optimizer.step()
+            scheduler.step()
+            
+            loss_tmp = torch.tensor(0.).to(device=DEVICE)
     
     if epoch > 0:
         ## Update and save model
@@ -775,19 +795,23 @@ def transfer_learning(train_args, N_rounds = 5, n_train = 1, n_sample_lst = [128
         loss_idx = loss_diff < 0
         ## TODO: MODIFY IT!!!
         pos = int(np.argmax(loss_idx))
+        pos = max(pos, train_args["pasting_cutoff"] - 1)
         ts_lst = get_ts(train_args["pasting_cutoff"], train_args["pasting_T"])
-        ts_pos = ts_lst[(train_args["pasting_cutoff"] + 1):][pos]
+        ts_pos = ts_lst[pos] #ts_lst[(train_args["pasting_cutoff"] + 1):][pos]
         pos = int(np.argmin(np.abs(ts_lst - ts_pos)) - 1 - train_args["pasting_cutoff"])
-        if pos == 0 and loss_idx[0] == 0:
+        #if pos == 0 and loss_idx[train_args["pasting_cutoff"]] == 0:
+        if pos < 0:
             print("Not Enough Training!")
-            pos = train_args["pasting_cutoff"] + pos
+            pos = train_args["pasting_cutoff"] + 0#pos
 #            assert False
             #pos = max(0, T - (T - train_args["pasting_cutoff"]) * 2)
         else:
             pos = train_args["pasting_cutoff"] + pos
         if i < N_rounds - 1:
+            train_args["pasting_T"] = int((T - pos) / (T - train_args["pasting_cutoff"]) * train_args["pasting_T"])
             train_args["pasting_cutoff"] = pos
             train_args["retrain"] = True
+        print(pos)
     
     phi_dot_stm_algo, phi_stm_algo, loss_eval_algo = evaluation(dW_STD_transfer, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0, pasting_cutoff = train_args["pasting_cutoff"], is_arr = False, pasting_T = train_args["pasting_T"])
     ## Write Logs
@@ -812,23 +836,27 @@ train_args = {
     "cost": cost,
     "model_name": "discretized_feedforward",
     "solver": "Adam",
-    "hidden_lst": [50, 50, 50],
+    "hidden_lst": [10],#[50, 50, 50],
     "lr": 1e-3,
     "epoch": 20000,
+    "train_freq": 1,
+    "train_cut": 10,
     "decay": 0.1,
     "scheduler_step": 200000,
     "retrain": False,
     "pasting_cutoff": 2480, #4800,
-    "pasting_T": 168, # None
+    "pasting_T": 160, # None
     "n_sample": N_SAMPLE
 }
 
 #curr_ts = "test"
 
-model, loss_arr, prev_ts, curr_ts, train_args = transfer_learning(train_args, N_rounds = 3, n_train = 2, n_sample_lst = [128, 500], lr_lst = [1e-3, 1e-4], epoch_lst = [10, 10])
+#model, loss_arr, prev_ts, curr_ts, train_args = transfer_learning(train_args, N_rounds = 1, n_train = 1, n_sample_lst = [128, 500], lr_lst = [1e-3, 1e-4], epoch_lst = [20, 10, 10])
+model, loss_arr, prev_ts, curr_ts, train_args = transfer_learning(train_args, N_rounds = 1, n_train = 1, n_sample_lst = [3000, 500], lr_lst = [1e-3, 1e-4], epoch_lst = [1000, 10])
 #model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
 model.eval()
 ## TODO: Modify It!!!
+dW_STD[:,:train_args["pasting_cutoff"],:] = dW_STD[0,:train_args["pasting_cutoff"],:]
 dW_STD_transfer = get_dW(train_args["pasting_cutoff"], train_args["pasting_T"], N_SAMPLE, dW_orig = dW_STD, seed = 0)
 TIMESTAMPS = get_ts(train_args["pasting_cutoff"], train_args["pasting_T"])
 

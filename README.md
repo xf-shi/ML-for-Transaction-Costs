@@ -36,7 +36,7 @@ The general variables and the market parameters in the code are summarized below
 ## Basic Setup for the case with multiple stocks
 
 For high dimensional case with three stocks, we consider the quadratic transaction cost model. Again, both of the FBSDE solver and the Deep Hedging are implemented. And the asymptotic formula from Equation (3.4) in reference [2], and the ground truth from equation (4.1) in reference [2] are included in `leading_order_quad` and `ground_truth` of `DynamicsFactory` class in 
-[`SingleAgent-Stage2/SingleAgentPipe.py`](./SingleAgent-Stage2/SingleAgentPipe.py). Finally, we implement the pasting algorithm illustrated in Section (4.3) in reference [2]. 
+[`SingleAgent-Stage2/SingleAgentPipe.py`](./SingleAgent-Stage2/SingleAgentPipe.py). Finally, we implement the ST-Hedging algorithm illustrated in Section (4.3) in reference [2]. 
 <br/><br/>
 The general variables and the market parameters in the code are summarized below:
 | Variable | Meaning |
@@ -120,10 +120,10 @@ The core dynamic is defined in the function `deep_hedging`, and the key variable
 | `phi_stm_bar` | collection of the frictionless positions throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\bar{\varphi_t}\}" /> |
 | `phi_dot_stm` | output of the neural network <img src="https://latex.codecogs.com/gif.latex?F^{\theta} " />, collection of the frictional trading rate throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\dot{\varphi_t}\}" /> |
 
-## Pasting Algorithm
-For the detailed implementation of the Pasting Algorithm, see the class `DynamicsFactory` in 
+## ST-Hedging Algorithm
+For the detailed implementation of the ST-Hedging Algorithm, see the class `DynamicsFactory` in 
 [`SingleAgent-Stage2/SingleAgentPipe.py`](./SingleAgent-Stage2/SingleAgentPipe.py);      
-The core dynamic is defined in the function `pasting`, and the key variables in the code are summarized below:   
+The core dynamic is defined in the function `st_hedging`, and the key variables in the code are summarized below:   
 | Variable | Meaning |
 | --- | ---  |
 | `M`  | cut-off value for the trading horizon considered as long enough for the leading-order solution   |

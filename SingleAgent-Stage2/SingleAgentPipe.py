@@ -612,6 +612,34 @@ class DynamicsFactory():
         phi_dot_stm = torch.cat((phi_dot_stm_leading_order, phi_dot_stm_pasting), dim = 1)
         phi_stm = torch.cat((phi_stm_leading_order, phi_stm_pasting[:,1:,:]), dim = 1)
         return phi_dot_stm, phi_stm
+    
+    def st_hedging(self, model, M, dt = TR / T, pasting_T = None, pasting_algo = "deep_hedging"):
+#        phi_stm = torch.zeros((self.n_sample, T + 1, N_STOCK)).to(device = DEVICE)
+##         phi_stm[:,0,:] = S_OUTSTANDING / 2
+#        phi_dot_stm = torch.zeros((self.n_sample, T, N_STOCK)).to(device = DEVICE)
+        if POWER == 2:
+            phi_dot_stm_leading_order, phi_stm_leading_order = self.leading_order_quad(time_len = M)
+        else:
+            phi_dot_stm_leading_order, phi_stm_leading_order = self.leading_order_power(POWER, time_len = M)
+#        print(phi_stm_leading_order[0,-1,:])
+        if pasting_T is None:
+            time_len = T - M
+        else:
+            time_len = pasting_T
+        if pasting_algo == "deep_hedging":
+            phi_dot_stm_pasting, phi_stm_pasting = self.deep_hedging(model, time_len = time_len, phi_0 = phi_stm_leading_order[:,-1,:].data, start_t = M, dt = dt)
+        else:
+            if POWER == 2:
+                phi_dot_stm_pasting, phi_stm_pasting, _ = self.fbsde_quad(model, time_len = time_len, phi_0 = phi_stm_leading_order[:,-1,:].data, start_t = M, dt = dt)
+            else:
+                phi_dot_stm_pasting, phi_stm_pasting = self.fbsde_power(model, time_len = time_len, phi_0 = phi_stm_leading_order[:,-1,:].data, start_t = M, dt = dt)
+#        phi_dot_stm[:,:M,:] += phi_dot_stm_leading_order
+#        phi_stm[:,:(M+1),:] += phi_stm_leading_order
+#        phi_dot_stm[:,M:,:] += phi_dot_stm_deep_hedging
+#        phi_stm[:,(M+1):,:] += phi_stm_deep_hedging[:,1:,:]
+        phi_dot_stm = torch.cat((phi_dot_stm_leading_order, phi_dot_stm_pasting), dim = 1)
+        phi_stm = torch.cat((phi_stm_leading_order, phi_stm_pasting[:,1:,:]), dim = 1)
+        return phi_dot_stm, phi_stm
 
 ## TODO: Implement it
 ## Return the loss as a tensor

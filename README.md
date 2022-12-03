@@ -4,10 +4,10 @@ This repository contains the Forward-Backward Stochastic Differential Equation (
 
 The special case with following assumptions is considered:
 
-* the dynamic of the market satisfies that return <img src="https://latex.codecogs.com/gif.latex?\mu" /> and voalatility <img src="https://latex.codecogs.com/gif.latex?\sigma" /> are constant;
-* the cost parameter <img src="https://latex.codecogs.com/gif.latex?\lambda" /> is constant;
-* the endowment volatility is in the form of <img src="https://latex.codecogs.com/gif.latex?\xi_t={\xi}W_t" /> where <img src="https://latex.codecogs.com/gif.latex?{\xi}" /> is constant; 
-* the frictionless strategy satisfies that   <img src="https://latex.codecogs.com/gif.latex?\bar{b}_t=0" /> and <img src="https://latex.codecogs.com/gif.latex?\bar{a}_t=-{\xi}/{\sigma}" />
+* the dynamic of the market satisfies that return <img src="https://latex.codecogs.com/svg.latex?\mu" /> and voalatility <img src="https://latex.codecogs.com/svg.latex?\sigma" /> are constant;
+* the cost parameter <img src="https://latex.codecogs.com/svg.latex?\lambda" /> is constant;
+* the endowment volatility is in the form of <img src="https://latex.codecogs.com/svg.latex?\xi_t={\xi}W_t" /> where <img src="https://latex.codecogs.com/svg.latex?{\xi}" /> is constant; 
+* the frictionless strategy satisfies that   <img src="https://latex.codecogs.com/svg.latex?\bar{b}_t=0" /> and <img src="https://latex.codecogs.com/svg.latex?\bar{a}_t=-{\xi}/{\sigma}" />
 
 ## Basic Setup for the case with a single stock
 
@@ -24,13 +24,13 @@ The general variables and the market parameters in the code are summarized below
 | `S_OUTSTANDING` | total shares in the market, s |
 | `TIME` | trading horizon, T |
 | `TIME_STEP` |   time discretization, N |
-| `DT ` | <img src="https://latex.codecogs.com/gif.latex?\Delta%20t={T}/{N}" />  |
-| `GAMMA` | risk aversion, <img src="https://latex.codecogs.com/gif.latex?\gamma" /> |
-| `XI_1` | endowment volatility parameter, <img src="https://latex.codecogs.com/gif.latex?{\xi}" /> |
-| `PHI_INITIAL` | initial holding,  <img src="https://latex.codecogs.com/gif.latex?\varphi_{0-}" /> |
-| `ALPHA` | market volatility,  <img src="https://latex.codecogs.com/gif.latex?\sigma " /> |
-| `MU_BAR` | market return,  <img src="https://latex.codecogs.com/gif.latex?\mu " /> |
-| `LAM` | trading cost parameter, <img src="https://latex.codecogs.com/gif.latex?\lambda " /> |
+| `DT ` | <img src="https://latex.codecogs.com/svg.latex?\Delta%20t={T}/{N}" />  |
+| `GAMMA` | risk aversion, <img src="https://latex.codecogs.com/svg.latex?\gamma" /> |
+| `XI_1` | endowment volatility parameter, <img src="https://latex.codecogs.com/svg.latex?{\xi}" /> |
+| `PHI_INITIAL` | initial holding,  <img src="https://latex.codecogs.com/svg.latex?\varphi_{0-}" /> |
+| `ALPHA` | market volatility,  <img src="https://latex.codecogs.com/svg.latex?\sigma " /> |
+| `MU_BAR` | market return,  <img src="https://latex.codecogs.com/svg.latex?\mu " /> |
+| `LAM` | trading cost parameter, <img src="https://latex.codecogs.com/svg.latex?\lambda " /> |
 | `test_samples` | number of test sample path, batch_size |
 
 ## Basic Setup for the case with multiple stocks
@@ -46,11 +46,11 @@ The general variables and the market parameters in the code are summarized below
 | `TR` | trading horizon, T |
 | `T` |   time discretization, N |
 | `BM_COV` |  Covariance matrix of the high dimensional Brownian Motion,  an identity matrix. |
-| `GAMMA` | risk aversion, <img src="https://latex.codecogs.com/gif.latex?\gamma" /> |
-| `xi_dd` | endowment volatility parameter, <img src="https://latex.codecogs.com/gif.latex?{\xi}" /> |
-| `alpha_stmd` | market volatility,  <img src="https://latex.codecogs.com/gif.latex?\sigma " /> |
-| `mu_stm` | market return,  <img src="https://latex.codecogs.com/gif.latex?\mu " /> |
-| `lam_mm` | trading cost parameter, <img src="https://latex.codecogs.com/gif.latex?\Lambda " /> |
+| `GAMMA` | risk aversion, <img src="https://latex.codecogs.com/svg.latex?\gamma" /> |
+| `xi_dd` | endowment volatility parameter, <img src="https://latex.codecogs.com/svg.latex?{\xi}" /> |
+| `alpha_stmd` | market volatility,  <img src="https://latex.codecogs.com/svg.latex?\sigma " /> |
+| `mu_stm` | market return,  <img src="https://latex.codecogs.com/svg.latex?\mu " /> |
+| `lam_mm` | trading cost parameter, <img src="https://latex.codecogs.com/svg.latex?\Lambda " /> |
 | `N_SAMPLE` | number of test sample path, batch_size |
 
 
@@ -62,18 +62,18 @@ The core dynamic is defined in the method `System.forward()`, and the key variab
 | --- | --- |
 | `time_step` | time discretization, N |
 | `n_samples` | number of sample path, batch_size |
-| `dW_t`  | iid normally distributed random variables with mean zero and variance <img src="https://latex.codecogs.com/gif.latex?\Delta%20t" />, <img src="https://latex.codecogs.com/gif.latex?\Delta%20W_t" /> |
-| `W_t` | Brownian motion at time t, <img src="https://latex.codecogs.com/gif.latex?W_t" />  |
-|  `XI_t` | Brownian motion at time t, <img src="https://latex.codecogs.com/gif.latex?W_t" /> |
+| `dW_t`  | iid normally distributed random variables with mean zero and variance <img src="https://latex.codecogs.com/svg.latex?\Delta%20t" />, <img src="https://latex.codecogs.com/svg.latex?\Delta%20W_t" /> |
+| `W_t` | Brownian motion at time t, <img src="https://latex.codecogs.com/svg.latex?W_t" />  |
+|  `XI_t` | Brownian motion at time t, <img src="https://latex.codecogs.com/svg.latex?W_t" /> |
 | `sigma_t` | vector of 0 |
 |  `sigmaxi_t` | vector of 1 |
 |  `X_t` | vector of 1 |
 |  `Y_t` | vector of 0 |
 | `Lam_t` | 1 |
-|  `in_t` | input of the neural network <img src="https://latex.codecogs.com/gif.latex?F^{\theta} " /> |
-|   `sigmaZ_t` | output of the neural network <img src="https://latex.codecogs.com/gif.latex?F^{\theta} " />,  <img src="https://latex.codecogs.com/gif.latex?Z_{t} " /> |
-| `Delta_t` | difference between the frictional and frictionless positions (the **forward component**) divided by the endowment parameter, <img src="https://latex.codecogs.com/gif.latex?\Delta%20\varphi_t/\xi" /> |
-| `Z_t` | the **backward component**, <img src="https://latex.codecogs.com/gif.latex?Y_t " /> |
+|  `in_t` | input of the neural network <img src="https://latex.codecogs.com/svg.latex?F^{\theta} " /> |
+|   `sigmaZ_t` | output of the neural network <img src="https://latex.codecogs.com/svg.latex?F^{\theta} " />,  <img src="https://latex.codecogs.com/svg.latex?Z_{t} " /> |
+| `Delta_t` | difference between the frictional and frictionless positions (the **forward component**) divided by the endowment parameter, <img src="https://latex.codecogs.com/svg.latex?\Delta%20\varphi_t/\xi" /> |
+| `Z_t` | the **backward component**, <img src="https://latex.codecogs.com/svg.latex?Y_t " /> |
 
 ### Case for Multiple Stocks
 For the detailed implementation of the FBSDE solver, see the class `DynamicsFactory` in 
@@ -81,14 +81,14 @@ For the detailed implementation of the FBSDE solver, see the class `DynamicsFact
 The core dynamic is defined in the function `fbsde_quad`, and the key variables in the code are summarized below:   
 | Variable | Meaning |
 | --- | --- |
-| `dW_std`  | iid normally distributed random variables with mean zero and variance <img src="https://latex.codecogs.com/gif.latex?\Delta%20t" />, <img src="https://latex.codecogs.com/gif.latex?\Delta%20W_t" /> |
-| `W_std` | 3-dimsion Brownian motion at time t, <img src="https://latex.codecogs.com/gif.latex?W_t" />  |
-| `xi_std_w` | collection of the endowment volatility, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\xi_t\}" /> |
-|  `x` | input of the neural network <img src="https://latex.codecogs.com/gif.latex?F^{\theta} " /> |
-|   `Z_stmd` | output of the neural network <img src="https://latex.codecogs.com/gif.latex?F^{\theta} " />,  <img src="https://latex.codecogs.com/gif.latex?Z_{t} " /> |
-| `phi_stm` | collection of the frictional positions throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\varphi_t\}" /> |
-| `phi_stm_bar` | collection of the frictionless positions throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\bar{\varphi_t}\}" /> |
-| `phi_dot_stm` | collection of the frictional trading rate throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\dot{\varphi_t}\}" /> |
+| `dW_std`  | iid normally distributed random variables with mean zero and variance <img src="https://latex.codecogs.com/svg.latex?\Delta%20t" />, <img src="https://latex.codecogs.com/svg.latex?\Delta%20W_t" /> |
+| `W_std` | 3-dimsion Brownian motion at time t, <img src="https://latex.codecogs.com/svg.latex?W_t" />  |
+| `xi_std_w` | collection of the endowment volatility, throughout the trading horizon, <img src="https://latex.codecogs.com/svg.latex?\{\xi_t\}" /> |
+|  `x` | input of the neural network <img src="https://latex.codecogs.com/svg.latex?F^{\theta} " /> |
+|   `Z_stmd` | output of the neural network <img src="https://latex.codecogs.com/svg.latex?F^{\theta} " />,  <img src="https://latex.codecogs.com/svg.latex?Z_{t} " /> |
+| `phi_stm` | collection of the frictional positions throughout the trading horizon, <img src="https://latex.codecogs.com/svg.latex?\{\varphi_t\}" /> |
+| `phi_stm_bar` | collection of the frictionless positions throughout the trading horizon, <img src="https://latex.codecogs.com/svg.latex?\{\bar{\varphi_t}\}" /> |
+| `phi_dot_stm` | collection of the frictional trading rate throughout the trading horizon, <img src="https://latex.codecogs.com/svg.latex?\{\dot{\varphi_t}\}" /> |
 
 
 ## Deep Hedging
@@ -99,12 +99,12 @@ The core dynamic of the Deep Hedging is defined in the function `TRAIN_Utility()
 | --- | ---  |
 | `time_step`  |   time discretization, N |
 | `n_samples` | number of sample path, batch_size |
-| `PHI_0_on_s` | initial holding divided by the total shares in the market, <img src="https://latex.codecogs.com/gif.latex?\varphi_{0-}/s" /> |
-| `W` | collection of the Brownian motion, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{W_t\}" /> |
-| `XI_W_on_s` | collection of the endowment volatility divided by the total shares in the market, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\xi_t/s\}" /> |
-| `PHI_on_s` | collection of the frictional positions divided by the total shares in the market, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\varphi_t/s\}" /> |
-| `PHI_dot_on_s` | collection of the frictional trading rate divided by the total shares in the market, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\dot{\varphi_t}/s\}" /> |
-| `loss_Utility` | minus goal function, <img src="https://latex.codecogs.com/gif.latex?-J_T(\dot{\varphi})" /> |
+| `PHI_0_on_s` | initial holding divided by the total shares in the market, <img src="https://latex.codecogs.com/svg.latex?\varphi_{0-}/s" /> |
+| `W` | collection of the Brownian motion, throughout the trading horizon, <img src="https://latex.codecogs.com/svg.latex?\{W_t\}" /> |
+| `XI_W_on_s` | collection of the endowment volatility divided by the total shares in the market, throughout the trading horizon, <img src="https://latex.codecogs.com/svg.latex?\{\xi_t/s\}" /> |
+| `PHI_on_s` | collection of the frictional positions divided by the total shares in the market, throughout the trading horizon, <img src="https://latex.codecogs.com/svg.latex?\{\varphi_t/s\}" /> |
+| `PHI_dot_on_s` | collection of the frictional trading rate divided by the total shares in the market, throughout the trading horizon, <img src="https://latex.codecogs.com/svg.latex?\{\dot{\varphi_t}/s\}" /> |
+| `loss_Utility` | minus goal function, <img src="https://latex.codecogs.com/svg.latex?-J_T(\dot{\varphi})" /> |
 
 ### Case for Multiple Stocks
 For the detailed implementation of the Deep Hedging, see the class `DynamicsFactory` in 
@@ -112,13 +112,13 @@ For the detailed implementation of the Deep Hedging, see the class `DynamicsFact
 The core dynamic is defined in the function `deep_hedging`, and the key variables in the code are summarized below:   
 | Variable | Meaning |
 | --- | ---  |
-| `dW_std`  | iid normally distributed random variables with mean zero and variance <img src="https://latex.codecogs.com/gif.latex?\Delta%20t" />, <img src="https://latex.codecogs.com/gif.latex?\Delta%20W_t" /> |
-| `W_std` | 3-dimsion Brownian motion at time t, <img src="https://latex.codecogs.com/gif.latex?W_t" />  |
-| `xi_std_w` | collection of the endowment volatility, throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\xi_t\}" /> |
-|  `x` | input of the neural network <img src="https://latex.codecogs.com/gif.latex?F^{\theta} " /> |
-| `phi_stm` | collection of the frictional positions throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\varphi_t\}" /> |
-| `phi_stm_bar` | collection of the frictionless positions throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\bar{\varphi_t}\}" /> |
-| `phi_dot_stm` | output of the neural network <img src="https://latex.codecogs.com/gif.latex?F^{\theta} " />, collection of the frictional trading rate throughout the trading horizon, <img src="https://latex.codecogs.com/gif.latex?\{\dot{\varphi_t}\}" /> |
+| `dW_std`  | iid normally distributed random variables with mean zero and variance <img src="https://latex.codecogs.com/svg.latex?\Delta%20t" />, <img src="https://latex.codecogs.com/svg.latex?\Delta%20W_t" /> |
+| `W_std` | 3-dimsion Brownian motion at time t, <img src="https://latex.codecogs.com/svg.latex?W_t" />  |
+| `xi_std_w` | collection of the endowment volatility, throughout the trading horizon, <img src="https://latex.codecogs.com/svg.latex?\{\xi_t\}" /> |
+|  `x` | input of the neural network <img src="https://latex.codecogs.com/svg.latex?F^{\theta} " /> |
+| `phi_stm` | collection of the frictional positions throughout the trading horizon, <img src="https://latex.codecogs.com/svg.latex?\{\varphi_t\}" /> |
+| `phi_stm_bar` | collection of the frictionless positions throughout the trading horizon, <img src="https://latex.codecogs.com/svg.latex?\{\bar{\varphi_t}\}" /> |
+| `phi_dot_stm` | output of the neural network <img src="https://latex.codecogs.com/svg.latex?F^{\theta} " />, collection of the frictional trading rate throughout the trading horizon, <img src="https://latex.codecogs.com/svg.latex?\{\dot{\varphi_t}\}" /> |
 
 ## ST-Hedging Algorithm
 For the detailed implementation of the ST-Hedging Algorithm, see the class `DynamicsFactory` in 
@@ -133,7 +133,7 @@ The core dynamic is defined in the function `st_hedging`, and the key variables 
 | `phi_dot_stm_leading_order` | collection of the frictional trading rate from the initial time to time M, given by the leading-order solution|
 | `phi_stm_deep_hedging` | collection of the frictional positions from time M to the end of trading horizon, given by the deep hedging|
 | `phi_dot_stm_deep_hedging` | collection of the frictional trading rate from time M to the end of trading horizon, given by the deep hedging|
-| `phi_0` | initial value of frictional position for the deep heding, given by the leading-order formula at the cut-off time at time M,  <img src="https://latex.codecogs.com/gif.latex?\{\varphi_M\}" /> |
+| `phi_0` | initial value of frictional position for the deep heding, given by the leading-order formula at the cut-off time at time M,  <img src="https://latex.codecogs.com/svg.latex?\{\varphi_M\}" /> |
 
 
 
@@ -145,20 +145,20 @@ The trading horizon is discretized in 168 time steps (`TIME_STEP=168`). The para
 
 | Parameter | Value | Code | 
 | --- | ---  | --- | 
-| agent risk aversion  | <img src="https://latex.codecogs.com/gif.latex?\gamma=1.66\times10^{-13}"/> | `GAMMA=1.66*1e-13` | 
-|total shares outstanding |<img src="https://latex.codecogs.com/gif.latex?s=2.46\times10^{11}"/> | `S_OUTSTANDING=2.46*1e11` |
-|stock volatility  |<img src="https://latex.codecogs.com/gif.latex?\sigma=1.88"/>  | `ALPHA=1.88`|
-| stock return|<img src="https://latex.codecogs.com/gif.latex?\mu=0.5\times\gamma\times\sigma^2"/> |`MU_BAR=0.5*GAMMA*ALPHA**2` |
-| endowment volatility parameter | <img src="https://latex.codecogs.com/gif.latex?{\xi}=2.19\times10^{10}" />| `XI_1=2.19*1e10` |
-| trading cost parameter |<img src="https://latex.codecogs.com/gif.latex?\lambda=1.08\times10^{-10}"/> | `LAM=1.08*1e-10`|
+| agent risk aversion  | <img src="https://latex.codecogs.com/svg.latex?\gamma=1.66\times10^{-13}"/> | `GAMMA=1.66*1e-13` | 
+|total shares outstanding |<img src="https://latex.codecogs.com/svg.latex?s=2.46\times10^{11}"/> | `S_OUTSTANDING=2.46*1e11` |
+|stock volatility  |<img src="https://latex.codecogs.com/svg.latex?\sigma=1.88"/>  | `ALPHA=1.88`|
+| stock return|<img src="https://latex.codecogs.com/svg.latex?\mu=0.5\times\gamma\times\sigma^2"/> |`MU_BAR=0.5*GAMMA*ALPHA**2` |
+| endowment volatility parameter | <img src="https://latex.codecogs.com/svg.latex?{\xi}=2.19\times10^{10}" />| `XI_1=2.19*1e10` |
+| trading cost parameter |<img src="https://latex.codecogs.com/svg.latex?\lambda=1.08\times10^{-10}"/> | `LAM=1.08*1e-10`|
 
 And these lead to the optimal trading rate (left panel) and the optimal position (right panel) illustrated below, leanrt by the FBSDE solver and the Deep Hedging, as well as the ground truth and the Leading-order solution based on the asymptotic formula:   
 
 ![TR=21_q=2](./Gallery/single_quad_21.png)
 <br/>
-With the same simulation with test batch size of 3000 (`test_samples=3000`), the expectation and the standard deviation of the goal function <img src="https://latex.codecogs.com/gif.latex?J_T(\dot{\varphi})"/> and the mean square error of the terminal trading rate are calculated, as summarized below:
+With the same simulation with test batch size of 3000 (`test_samples=3000`), the expectation and the standard deviation of the goal function <img src="https://latex.codecogs.com/svg.latex?J_T(\dot{\varphi})"/> and the mean square error of the terminal trading rate are calculated, as summarized below:
 
-| Method | <img src="https://latex.codecogs.com/gif.latex?J_T(\dot{\varphi})\pm%20\mathrm{std}"/> | <img src="https://latex.codecogs.com/gif.latex?\mathbb{E}[(\dot{\varphi_T})^2/s^2]"/> | 
+| Method | <img src="https://latex.codecogs.com/svg.image?J_T(\dot{\varphi})\pm%20\mathrm{std}"/> | <img src="https://latex.codecogs.com/svg.image?\mathbb{E}[(\dot{\varphi_T})^2/s^2]"/> | 
 | --- | ---  | --- | 
 | FBSDE Solver  | <img src="https://latex.codecogs.com/svg.image?4.13\times&space;10^9\pm&space;2.20&space;\times&space;10^9"/> | <img src="https://latex.codecogs.com/svg.image?1.35\times&space;10^{-8}"/> | 
 | Deep Hedging  | <img src="https://latex.codecogs.com/svg.image?4.13\times&space;10^9\pm&space;2.20&space;\times&space;10^9"/> | <img src="https://latex.codecogs.com/svg.image?3.62\times&space;10^{-9}"/> | 

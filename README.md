@@ -160,10 +160,11 @@ With the same simulation with test batch size of 3000 (`test_samples=3000`), the
 
 | Method | <img src="https://latex.codecogs.com/gif.latex?J_T(\dot{\varphi})\pm%20\mathrm{std}"/> | <img src="https://latex.codecogs.com/gif.latex?\mathbb{E}[(\dot{\varphi_T})^2/s^2]"/> | 
 | --- | ---  | --- | 
-| FBSDE Solver  | <img src="https://latex.codecogs.com/gif.latex?4.11\times10^9\pm%202.20\times10^9"/> | <img src="https://latex.codecogs.com/gif.latex?1.61\times10^{-8}"/> | 
-| Deep Hedging  | <img src="https://latex.codecogs.com/gif.latex?4.13\times10^9\pm%202.20\times10^9"/> | <img src="https://latex.codecogs.com/gif.latex?3.62\times10^{-9}"/> | 
-| Leading Order Approximation  |  <img src="https://latex.codecogs.com/gif.latex?4.06\times10^9\pm%202.21\times10^9"/> | <img src="https://latex.codecogs.com/gif.latex?7.89\times10^{-5}"/>| 
-| Ground Truth |  <img src="https://latex.codecogs.com/gif.latex?4.13\times10^9\pm%202.20\times10^9"/> | <img src="https://latex.codecogs.com/gif.latex?1.25\times10^{-8}"/>| 
+| FBSDE Solver  | <img src="https://latex.codecogs.com/svg.image?4.13\times&space;10^9\pm&space;2.20&space;\times&space;10^9"/> | <img src="https://latex.codecogs.com/svg.image?1.35\times&space;10^{-8}"/> | 
+| Deep Hedging  | <img src="https://latex.codecogs.com/svg.image?4.13\times&space;10^9\pm&space;2.20&space;\times&space;10^9"/> | <img src="https://latex.codecogs.com/svg.image?3.62\times&space;10^{-9}"/> | 
+| ST Hedging  | <img src="https://latex.codecogs.com/svg.image?4.13\times&space;10^9\pm&space;2.19&space;\times&space;10^9"/> | <img src="https://latex.codecogs.com/svg.image?1.26&space;\times&space;10^{-8}"/> | 
+| Leading Order Approximation  |  <img src="https://latex.codecogs.com/svg.image?4.06\times&space;10^9\pm&space;2.21&space;\times&space;10^9"/> | <img src="https://latex.codecogs.com/svg.image?7.89&space;\times&space;10^{-5}"/>| 
+| Ground Truth |  <img src="https://latex.codecogs.com/svg.image?4.13\times&space;10^9\pm&space;2.20&space;\times&space;10^9"/> | <img src="https://latex.codecogs.com/svg.image?0.0"/>| 
 
 
 

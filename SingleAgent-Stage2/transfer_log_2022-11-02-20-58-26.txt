@@ -1,0 +1,6 @@
+Round #1/1 - Cutoff: 454/504
+	Iteration #1/1 - Utility Loss: -1.617127776145935
+
+utility loss: mu = 1.617e+00, std = 1.092e-04; term_err = [3.582e-06	2.127e-06	1.069e-06]
+leading order loss: mu = 1.617e+00, std = 1.092e-04; term_err = [1.270e-04	7.213e-05	3.255e-05]
+ground truth loss: mu = 1.617e+00, std = 1.092e-04; term_err = [0.000e+00	0.000e+00	0.000e+00]

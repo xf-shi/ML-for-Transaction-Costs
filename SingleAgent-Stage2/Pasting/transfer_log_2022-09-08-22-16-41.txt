@@ -1,0 +1,14 @@
+Round #1/5 - Cutoff: 9880/10080
+	Iteration #1/1 - Utility Loss: -6.329922676086426
+Round #2/5 - Cutoff: 9880/10080
+	Iteration #1/1 - Utility Loss: -6.329922676086426
+Round #3/5 - Cutoff: 9880/10080
+	Iteration #1/1 - Utility Loss: -6.329922676086426
+Round #4/5 - Cutoff: 9880/10080
+	Iteration #1/1 - Utility Loss: -6.329922676086426
+Round #5/5 - Cutoff: 9880/10080
+	Iteration #1/1 - Utility Loss: -6.329922676086426
+
+utility loss: -6.329923152923584
+leading order loss: -6.329703330993652
+ground truth loss: -6.3297119140625

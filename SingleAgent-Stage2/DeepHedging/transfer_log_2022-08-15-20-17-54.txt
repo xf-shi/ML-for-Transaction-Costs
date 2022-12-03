@@ -1,0 +1,23 @@
+Round #1/10 - Cutoff: 2436/2520
+	Iteration #1/1 - Utility Loss: -0.035837724804878235
+Round #2/10 - Cutoff: 2446/2520
+	Iteration #1/1 - Utility Loss: -0.03580348566174507
+Round #3/10 - Cutoff: 2455/2520
+	Iteration #1/1 - Utility Loss: -0.03583589941263199
+Round #4/10 - Cutoff: 2469/2520
+	Iteration #1/1 - Utility Loss: -0.03590002655982971
+Round #5/10 - Cutoff: 2481/2520
+	Iteration #1/1 - Utility Loss: -0.0359019935131073
+Round #6/10 - Cutoff: 2491/2520
+	Iteration #1/1 - Utility Loss: -0.035865072160959244
+Round #7/10 - Cutoff: 2499/2520
+	Iteration #1/1 - Utility Loss: -0.03588160499930382
+Round #8/10 - Cutoff: 2504/2520
+	Iteration #1/1 - Utility Loss: -0.03587765246629715
+Round #9/10 - Cutoff: 2505/2520
+	Iteration #1/1 - Utility Loss: -0.03587687388062477
+Round #10/10 - Cutoff: 2505/2520
+	Iteration #1/1 - Utility Loss: -0.03587687388062477
+
+utility loss: -0.03587687388062477
+leading order loss: -0.03587494045495987

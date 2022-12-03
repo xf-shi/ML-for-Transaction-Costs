@@ -1,0 +1,7 @@
+Round #1/1 - Cutoff: 2470/2520
+	Iteration #1/1 - Utility Loss: -4041852416.0
+
+utility loss: mu = 3.871e+09, std = 2.469e+10; term_err = 8.461e-07	
+deep heding loss: mu = 3.321e+09, std = 2.457e+10; term_err = 2.366e-07	
+leading order loss: mu = 3.870e+09, std = 2.469e+10; term_err = 8.628e-05	
+ground truth loss: mu = 3.871e+09, std = 2.469e+10; term_err = 0.000e+00	

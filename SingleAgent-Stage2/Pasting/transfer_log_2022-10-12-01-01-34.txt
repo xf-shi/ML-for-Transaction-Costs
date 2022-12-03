@@ -1,0 +1,5 @@
+Round #1/1 - Cutoff: 454/504
+	Iteration #1/1 - Utility Loss: -3.896315336227417
+
+utility loss: -3.896314859390259
+leading order loss: -3.8960928916931152

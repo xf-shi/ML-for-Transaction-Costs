@@ -1,0 +1,10 @@
+Round #1/3 - Cutoff: 4990/5040
+	Iteration #1/1 - Utility Loss: -2.2325663566589355
+Round #2/3 - Cutoff: 4990/5040
+	Iteration #1/1 - Utility Loss: -2.2325663566589355
+Round #3/3 - Cutoff: 4990/5040
+	Iteration #1/1 - Utility Loss: -2.2325663566589355
+
+utility loss: -2.2325665950775146
+leading order loss: -2.2318971157073975
+ground truth loss: -2.2319188117980957

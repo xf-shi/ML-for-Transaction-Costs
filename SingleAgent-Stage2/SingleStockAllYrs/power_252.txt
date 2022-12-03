@@ -1,0 +1,19 @@
+Round #1/1 - Cutoff: 202/252
+Round #1/1 - Cutoff: 202/252
+	Iteration #1/1 - Utility Loss: -4183753472.0
+
+utility loss: mu = 4.564e+09, std = 9.453e+09; term_err = 1.526e-08	
+deep heding loss: mu = 4.415e+09, std = 9.386e+09; term_err = 1.872e-06	
+leading order loss: mu = 4.560e+09, std = 9.451e+09; term_err = 6.854e-05	
+Round #1/1 - Cutoff: 202/252
+	Iteration #1/1 - Utility Loss: -4183753472.0
+
+utility loss: mu = 4.564e+09, std = 9.453e+09; term_err = 1.526e-08	
+deep heding loss: mu = 4.415e+09, std = 9.386e+09; term_err = 1.872e-06	
+leading order loss: mu = 4.560e+09, std = 9.451e+09; term_err = 6.854e-05	
+Round #1/1 - Cutoff: 202/252
+	Iteration #1/1 - Utility Loss: -4183753472.0
+
+utility loss: mu = 4.564e+09, std = 9.453e+09; term_err = 1.526e-08	
+deep heding loss: mu = 4.562e+09, std = 9.457e+09; term_err = 9.265e-09	
+leading order loss: mu = 4.560e+09, std = 9.451e+09; term_err = 6.854e-05	

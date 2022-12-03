@@ -1,0 +1,3 @@
+utility loss: mu = 4.677e+09, std = 5.717e+09; term_err = 1.054e-04
+deep heding loss: mu = 4.822e+09, std = 5.857e+09; term_err = 2.032e-08	
+leading order loss: mu = 4.665e+09, std = 5.706e+09; term_err = 7.831e-05	

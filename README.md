@@ -1,6 +1,6 @@
 # Deep Learning Algorithms for Hedging with Frictions
 
-This repository contains the Forward-Backward Stochastic Differential Equation (FBSDE) solver and the Deep Hedging, as described in reference [2]. Both of them are implemented in PyTorch.
+This repository contains the Forward-Backward Stochastic Differential Equation (FBSDE) solver, the Deep Hedging, and the ST-Hedging, as described in reference [2]. All of them are implemented in PyTorch.
 
 The special case with following assumptions is considered:
 
@@ -11,7 +11,7 @@ The special case with following assumptions is considered:
 
 ## Basic Setup for the case with a single stock
 
-We consider two calibrated models: a quadratic transaction cost models, and a power cost model with elastic parameter of 3/2. In both experiments, the FBSDE solver and the Deep Hedging are implemented, as well as the asymptotic formula from Equation (3.4) in reference [2].     
+We consider two calibrated models: a quadratic transaction cost models, and a power cost model with elastic parameter of 3/2. In both experiments, the FBSDE solver, the Deep Hedging, and the ST-Hedging, are implemented, as well as the asymptotic formula from Equation (3.4) in reference [2].     
 <br/>
 For the case of quadratic costs, the ground truth from equation (4.1) in reference [2] is also compared. See [`Script/sample_code_quadratic_cost.py`](./Script/sample_code_quadratic_cost.py) for details.   
 <br/>
@@ -35,8 +35,8 @@ The general variables and the market parameters in the code are summarized below
 
 ## Basic Setup for the case with multiple stocks
 
-For high dimensional case with three stocks, we consider the quadratic transaction cost model. Again, both of the FBSDE solver and the Deep Hedging are implemented. And the asymptotic formula from Equation (3.4) in reference [2], and the ground truth from equation (4.1) in reference [2] are included in `leading_order_quad` and `ground_truth` of `DynamicsFactory` class in 
-[`SingleAgent-Stage2/SingleAgentPipe.py`](./SingleAgent-Stage2/SingleAgentPipe.py). Finally, we implement the ST-Hedging algorithm illustrated in Section (4.3) in reference [2]. 
+For high dimensional case with three stocks, we consider the quadratic transaction cost model. The asymptotic formula from Equation (3.4) in reference [2], and the ground truth from equation (4.1) in reference [2] are included in `leading_order_quad` and `ground_truth` of `DynamicsFactory` class in 
+[`SingleAgent-Stage2/SingleAgentPipe.py`](./SingleAgent-Stage2/SingleAgentPipe.py). And we implement the ST-Hedging algorithm illustrated in Section (4.3) in reference [2]. 
 <br/><br/>
 The general variables and the market parameters in the code are summarized below:
 | Variable | Meaning |
@@ -158,7 +158,7 @@ And these lead to the optimal trading rate (left panel) and the optimal position
 <br/>
 With the same simulation with test batch size of 3000 (`test_samples=3000`), the expectation and the standard deviation of the goal function <img src="https://latex.codecogs.com/gif.latex?J_T(\dot{\varphi})"/> and the mean square error of the terminal trading rate are calculated, as summarized below:
 
-| Method | <img src="https://latex.codecogs.com/gif.latex?J_T(\dot{\varphi})\pm%20\mathrm{std}"/> | <img src="https://latex.codecogs.com/gif.latex?\mathbb{E}[(\dot{\varphi_T})^2/s^2]"/> | 
+| Method | <img src="https://latex.codecogs.com/svg.image?4.13\times&space;10^9\pm&space;2.19&space;\times&space;10^9"/> | <img src="https://latex.codecogs.com/gif.latex?\mathbb{E}[(\dot{\varphi_T})^2/s^2]"/> | 
 | --- | ---  | --- | 
 | FBSDE Solver  | <img src="https://latex.codecogs.com/gif.latex?4.11\times10^9\pm%202.20\times10^9"/> | <img src="https://latex.codecogs.com/gif.latex?1.61\times10^{-8}"/> | 
 | Deep Hedging  | <img src="https://latex.codecogs.com/gif.latex?4.13\times10^9\pm%202.20\times10^9"/> | <img src="https://latex.codecogs.com/gif.latex?3.62\times10^{-9}"/> | 

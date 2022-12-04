@@ -15,7 +15,7 @@ We consider two calibrated models: a quadratic transaction cost models, and a po
 <br/>
 For the case of quadratic costs, the ground truth from equation (4.1) in reference [2] is also compared. See [`Script/sample_code_quadratic_cost.py`](./Script/sample_code_quadratic_cost.py) for details.   
 <br/>
-For the case of 3/2 power costs, the ground truth is no longer available in closed form. Meanwhile, in regard to the asymptotic formula g(x) in equation (3.5) in reference [2], the numerical solution by [SciPy](https://github.com/scipy/scipy) is not stable, thus it is solved via MATHEMATICA (see [`Script/power_cost_ODE.nb`](./Script/power_cost_ODE.nb)). Consequently, the value of g(x) corresponding to x ranging from 0 to 50 by 0.0001, is stored in table [`Data/EVA.txt`](./Data/EVA.txt). Benefitted from the oddness and the growth conditions (equation (A.5) in reference [2]), the value of g(x) on <img src="https://latex.codecogs.com/gif.latex?\mathbb{R}" /> is obatinable. Following that, the numerical result of the asymptotic solution is compared with two machine learning methods. See [`Script/sample_code_power_cost.py`](./Script/sample_code_power_cost.py) for details.
+For the case of 3/2 power costs, the ground truth is no longer available in closed form. Meanwhile, in regard to the asymptotic formula g(x) in equation (3.5) in reference [2], the numerical solution by [SciPy](https://github.com/scipy/scipy) is not stable, thus it is solved via MATHEMATICA (see [`Script/power_cost_ODE.nb`](./Script/power_cost_ODE.nb)). Consequently, the value of g(x) corresponding to x ranging from 0 to 50 by 0.0001, is stored in table [`Data/EVA.txt`](./Data/EVA.txt). Benefitted from the oddness and the growth conditions (equation (A.5) in reference [2]), the value of g(x) on <img src="https://latex.codecogs.com/svg.latex?\mathbb{R}" /> is obatinable. Following that, the numerical result of the asymptotic solution is compared with two machine learning methods. See [`Script/sample_code_power_cost.py`](./Script/sample_code_power_cost.py) for details.
 <br/><br/>
 The general variables and the market parameters in the code are summarized below:
 | Variable | Meaning |
@@ -152,7 +152,7 @@ The trading horizon is discretized in 168 time steps (`TIME_STEP=168`). The para
 | endowment volatility parameter | <img src="https://latex.codecogs.com/svg.latex?{\xi}=2.19\times10^{10}" />| `XI_1=2.19*1e10` |
 | trading cost parameter |<img src="https://latex.codecogs.com/svg.latex?\lambda=1.08\times10^{-10}"/> | `LAM=1.08*1e-10`|
 
-And these lead to the optimal trading rate (left panel) and the optimal position (right panel) illustrated below, leanrt by the FBSDE solver and the Deep Hedging, as well as the ground truth and the Leading-order solution based on the asymptotic formula:   
+And these lead to the optimal trading rate (left panel) and the optimal position (right panel) illustrated below, leanrt by the FBSDE solver, the Deep Hedging, and the ST-Hedging as well as the ground truth and the Leading-order solution based on the asymptotic formula:   
 
 ![TR=21_q=2](./Gallery/single_quad_21.png)
 <br/>

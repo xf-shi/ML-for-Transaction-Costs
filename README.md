@@ -139,6 +139,8 @@ The core dynamic is defined in the function `st_hedging`, and the key variables 
 
 
 ## Example  
+### Single Stock
+#### Quatratic Cost
 Here we proivde an example for the quadratic cost case (`q=2`) with the trading horizon of 21 days (`TIME=21`).    
 <br/>
 The trading horizon is discretized in 168 time steps (`TIME_STEP=168`). The parameters are taken from the calibration in [1]:
@@ -154,9 +156,10 @@ The trading horizon is discretized in 168 time steps (`TIME_STEP=168`). The para
 
 And these lead to the optimal trading rate (left panel) and the optimal position (right panel) illustrated below, leanrt by the FBSDE solver, the Deep Hedging, and the ST-Hedging as well as the ground truth and the Leading-order solution based on the asymptotic formula:   
 
-![TR=21_q=2](./Gallery/single_quad_21.png)
+<!--[TR=21_q=2](./Gallery/single_quad_21.png)-->
+![TR=21_q=2](./Gallery/single_quad_21_new.pdf)
 <br/>
-With the same simulation with test batch size of 3000 (`test_samples=3000`), the expectation and the standard deviation of the goal function <img src="https://latex.codecogs.com/svg.latex?J_T(\dot{\varphi})"/> and the mean square error of the terminal trading rate are calculated, as summarized below:
+With the simulation of a test batch size of 3000 (`test_samples=3000`), the expectation and the standard deviation of the goal function <img src="https://latex.codecogs.com/svg.latex?J_T(\dot{\varphi})"/> and the mean square error of the terminal trading rate are calculated, as summarized below:
 
 | Method | <img src="https://latex.codecogs.com/svg.image?J_T(\dot{\varphi})\pm%20\mathrm{std}"/> | <img src="https://latex.codecogs.com/svg.image?\mathbb{E}[(\dot{\varphi_T})^2/s^2]"/> | 
 | --- | ---  | --- | 
@@ -166,6 +169,35 @@ With the same simulation with test batch size of 3000 (`test_samples=3000`), the
 | Leading Order Approximation  |  <img src="https://latex.codecogs.com/svg.image?4.06\times&space;10^9\pm&space;2.21&space;\times&space;10^9"/> | <img src="https://latex.codecogs.com/svg.image?7.89&space;\times&space;10^{-5}"/>| 
 | Ground Truth |  <img src="https://latex.codecogs.com/svg.image?4.13\times&space;10^9\pm&space;2.20&space;\times&space;10^9"/> | <img src="https://latex.codecogs.com/svg.image?0.0"/>| 
 
+#### 3/2 Power Cost
+Here we proivde an example for the 3/2 power cost case (`q=3/2`) with the trading horizon of 21 days (`TIME=21`).    
+<br/>
+The trading horizon is discretized in 168 time steps (`TIME_STEP=168`). The parameters are taken from the calibration in [1]:
+
+| WRONG Parameter | Value | Code | 
+| --- | ---  | --- | 
+| agent risk aversion  | <img src="https://latex.codecogs.com/svg.latex?\gamma=1.66\times10^{-13}"/> | `GAMMA=1.66*1e-13` | 
+|total shares outstanding |<img src="https://latex.codecogs.com/svg.latex?s=2.46\times10^{11}"/> | `S_OUTSTANDING=2.46*1e11` |
+|stock volatility  |<img src="https://latex.codecogs.com/svg.latex?\sigma=1.88"/>  | `ALPHA=1.88`|
+| stock return|<img src="https://latex.codecogs.com/svg.latex?\mu=0.5\times\gamma\times\sigma^2"/> |`MU_BAR=0.5*GAMMA*ALPHA**2` |
+| endowment volatility parameter | <img src="https://latex.codecogs.com/svg.latex?{\xi}=2.19\times10^{10}" />| `XI_1=2.19*1e10` |
+| trading cost parameter |<img src="https://latex.codecogs.com/svg.latex?\lambda=1.08\times10^{-10}"/> | `LAM=1.08*1e-10`|
+
+And these lead to the optimal trading rate (left panel) and the optimal position (right panel) illustrated below, leanrt by the FBSDE solver, the Deep Hedging, and the ST-Hedging as well as the Leading-order solution based on the asymptotic formula:   
+
+![TR=21_q=3/2](./Gallery/single_3on2_21_new.pdf)
+<br/>
+With the simulation of a test batch size of 3000 (`test_samples=3000`), the expectation and the standard deviation of the goal function <img src="https://latex.codecogs.com/svg.latex?J_T(\dot{\varphi})"/> and the mean square error of the terminal trading rate are calculated, as summarized below:
+
+| WRONG Method | <img src="https://latex.codecogs.com/svg.image?J_T(\dot{\varphi})\pm%20\mathrm{std}"/> | <img src="https://latex.codecogs.com/svg.image?\mathbb{E}[(\dot{\varphi_T})^2/s^2]"/> | 
+| --- | ---  | --- | 
+| FBSDE Solver  | <img src="https://latex.codecogs.com/svg.image?4.13\times&space;10^9\pm&space;2.20&space;\times&space;10^9"/> | <img src="https://latex.codecogs.com/svg.image?1.35\times&space;10^{-8}"/> | 
+| Deep Hedging  | <img src="https://latex.codecogs.com/svg.image?4.13\times&space;10^9\pm&space;2.20&space;\times&space;10^9"/> | <img src="https://latex.codecogs.com/svg.image?3.62\times&space;10^{-9}"/> | 
+| ST Hedging  | <img src="https://latex.codecogs.com/svg.image?4.13\times&space;10^9\pm&space;2.19&space;\times&space;10^9"/> | <img src="https://latex.codecogs.com/svg.image?1.26&space;\times&space;10^{-8}"/> | 
+| Leading Order Approximation  |  <img src="https://latex.codecogs.com/svg.image?4.06\times&space;10^9\pm&space;2.21&space;\times&space;10^9"/> | <img src="https://latex.codecogs.com/svg.image?7.89&space;\times&space;10^{-5}"/>| 
+
+
+### Case for Multiple Stocks
 
 
 See more examples and discussion in Section 4 of paper [2].   

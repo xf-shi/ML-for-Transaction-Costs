@@ -206,13 +206,13 @@ The trading horizon is 2520 days (`TR=2520`), discretized in 2520 time steps (`T
 | Parameter | Value | Code | 
 | --- | ---  | --- | 
 | agent risk aversion  | <img src="https://latex.codecogs.com/svg.image?7.424&space;\times&space;10^{-13}"/> | `GAMMA = 1/(1/ (8.91*1e-13) + 1/ (4.45 * 1e-12) )` | 
-|total shares outstanding |<img src="https://latex.codecogs.com/svg.image?\begin{bmatrix}1.15&space;\times&space;10^{10}&space;&&space;3.2&space;\times&space;10^{9}&space;&&space;2.3&space;\times&space;10^{9}&space;&space;&space;\\\end{bmatrix}"/> | `S_OUTSTANDING = torch.tensor([1.15, 0.32, 0.23]) *1e10` |
+|total shares outstanding |<img src="https://latex.codecogs.com/svg.image?\begin{bmatrix}&space;1.15&space;\times&space;10^{10}\\&space;3.2&space;\times&space;10^9&space;\\&space;2.3&space;\times&space;10^9\end{bmatrix}"/> | `S_OUTSTANDING = torch.tensor([1.15, 0.32, 0.23]) *1e10` |
 |stock volatility  |<img src="https://latex.codecogs.com/svg.image?\begin{bmatrix}&space;72.00&&space;71.49&space;&&space;54.80&space;\\&space;71.49&space;&&space;85.42&space;&&space;65.86&space;\\&space;54.80&&space;65.86&space;&&space;&space;56.84\\\end{bmatrix}"/>  | `sigma_big = torch.tensor([[72.00, 71.49, 54.80],[71.49, 85.42, 65.86],[54.80, 65.86, 56.84]])`|
 | stock return|<img src="https://latex.codecogs.com/svg.image?\begin{bmatrix}&space;2.99&&space;3.71&&space;3.55&space;&space;&space;\\\end{bmatrix}"/> |`mu_stm = torch.ones((n_sample, time_len, N_STOCK)) * torch.tensor([[2.99, 3.71, 3.55]])` |
 | endowment volatility parameter | <img src="https://latex.codecogs.com/svg.image?\begin{bmatrix}&space;-2.07&&space;1.91&space;&&space;0.64&space;\\&space;1.91&&space;&space;-1.77&&space;-0.59&space;\\&space;0.64&&space;-0.59&space;&space;&&space;&space;-0.20\\\end{bmatrix}\times&space;10^9" />| `xi_dd = torch.tensor([[ -2.07, 1.91, 0.64],[1.91, -1.77, -0.59],[0.64 ,-0.59 ,-0.20]]) *1e9` |
 | trading cost parameter |<img src="https://latex.codecogs.com/svg.image?\begin{bmatrix}1.269&space;&&space;1.354&space;&&space;1.595&space;\\\end{bmatrix}\times&space;10^{-9}"/> | ` lam_mm = torch.diag(torch.tensor([0.1269, 0.1354, 0.1595])) * 1e-8`|
 
-And these lead to the optimal position (upper left panel) and the optimal trading rates illustrated below (we only include the tradings in the last 30 days), leanrt by the ST-Hedging as well as the ground truth and the Leading-order solution based on the asymptotic formula:   
+And these lead to the optimal position (the first plot) and the optimal trading rates illustrated below (we only include the tradings in the last 30 days), leanrt by the ST-Hedging as well as the ground truth and the Leading-order solution based on the asymptotic formula:   
 ![multiple stocks position](./Gallery/quad_phi_10yr.png "position") ![multiple stocks rate1](./Gallery/quad_phidot_10yr_1.png "rate 1")
 ![multiple stocks rate2](./Gallery/quad_phidot_10yr_2.png "rate 2") ![multiple stocks rate3](./Gallery/quad_phidot_10yr_3.png "rate 3")
 <br/>

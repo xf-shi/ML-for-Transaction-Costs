@@ -20,7 +20,7 @@ import sys
 ## TODO: Adjust these global constants:
 T = 2520 #504#1008#10080#5040 #2520 #5000 #
 TR = 2520#2520 
-N_SAMPLE = #3000#128
+N_SAMPLE = 3000#128
 POWER = 2 #3/2
 N_STOCK = 3 # 1
 HIGH_DIM = N_STOCK > 1

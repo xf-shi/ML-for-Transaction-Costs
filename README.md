@@ -196,7 +196,6 @@ With the simulation of a test batch size of 3000 (`test_samples=3000`), the expe
 | ST Hedging  | <img src="https://latex.codecogs.com/svg.image?4.02&space;\times&space;10^{9}&space;\pm&space;2.40&space;\times&space;10^{9}&space;"/> | <img src="https://latex.codecogs.com/svg.image?1.34&space;\times&space;10^{-10}"/> | 
 | Leading Order Approximation  |  <img src="https://latex.codecogs.com/svg.image?3.93&space;\times&space;10^{9}&space;\pm&space;2.42&space;\times&space;10^{9}&space;"/> | <img src="https://latex.codecogs.com/svg.image?1.10&space;\times&space;10^{-4}"/>| 
 
-
 ### Multiple Stocks
 To illustrate the scalability of our ST-Hedging algorithm, we proivde an example with three risky assets in the market with cross sectional effect, under the quadratic cost case (`q=2`).
 The trading horizon is 2520 days (`TR=2520`), discretized in 2520 time steps (`T=2520`), and the switching threshold is 100 days before maturity.

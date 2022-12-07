@@ -224,7 +224,6 @@ With the simulation of a test batch size of 3000 (`N_SAMPLE = 3000`), the expect
 | Leading Order Approximation  |  <img src="https://latex.codecogs.com/svg.image?1.60&space;\times&space;10^{11}&space;\pm&space;3.58&space;\times&space;10^6"/> | <img src="https://latex.codecogs.com/svg.image?\begin{pmatrix}&space;4.5&&space;3.5&space;&1.6&space;&space;\\\end{pmatrix}&space;\times&space;10^{-7}"/>| 
 | Ground Truth |  <img src="https://latex.codecogs.com/svg.image?1.60&space;\times&space;10^{11}&space;\pm&space;3.58&space;\times&space;10^6"/> | <img src="https://latex.codecogs.com/svg.image?\begin{pmatrix}&space;0.0&&space;0.0&space;&0.0&space;&space;\\\end{pmatrix}&space;"/>| 
 
-
 See more examples and discussion in Section 4 of paper [2].   
 
 <!-- 

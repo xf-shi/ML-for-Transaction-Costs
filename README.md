@@ -197,8 +197,33 @@ With the simulation of a test batch size of 3000 (`test_samples=3000`), the expe
 | Leading Order Approximation  |  <img src="https://latex.codecogs.com/svg.image?3.93&space;\times&space;10^{9}&space;\pm&space;2.42&space;\times&space;10^{9}&space;"/> | <img src="https://latex.codecogs.com/svg.image?1.10&space;\times&space;10^{-4}"/>| 
 
 
-### Case for Multiple Stocks
-to be continued...
+### Multiple Stocks
+To illustrate the scalability of our ST-Hedging algorithm, we proivde an example with three risky assets in the market with cross sectional effect, under the quadratic cost case (`q=2`).
+The trading horizon is 2520 days (`TR=2520`), discretized in 2520 time steps (`T=2520`), and the switching threshold is 100 days before maturity.
+
+ The parameters are taken from the calibration in [1]:
+
+| Parameter | Value | Code | 
+| --- | ---  | --- | 
+| agent risk aversion  | <img src="https://latex.codecogs.com/svg.image?7.424&space;\times&space;10^{-13}"/> | `GAMMA = 1/(1/ (8.91*1e-13) + 1/ (4.45 * 1e-12) )` | 
+|total shares outstanding |<img src="https://latex.codecogs.com/svg.image?\begin{bmatrix}1.15&space;\times&space;10^{10}&space;&&space;3.2&space;\times&space;10^{9}&space;&&space;2.3&space;\times&space;10^{9}&space;&space;&space;\\\end{bmatrix}"/> | `S_OUTSTANDING = torch.tensor([1.15, 0.32, 0.23]) *1e10` |
+|stock volatility  |<img src="https://latex.codecogs.com/svg.image?\begin{bmatrix}&space;72.00&&space;71.49&space;&&space;54.80&space;\\&space;71.49&space;&&space;85.42&space;&&space;65.86&space;\\&space;54.80&&space;65.86&space;&&space;&space;56.84\\\end{bmatrix}"/>  | `sigma_big = torch.tensor([[72.00, 71.49, 54.80],[71.49, 85.42, 65.86],[54.80, 65.86, 56.84]])`|
+| stock return|<img src="https://latex.codecogs.com/svg.image?\begin{bmatrix}&space;2.99&&space;3.71&&space;3.55&space;&space;&space;\\\end{bmatrix}"/> |`mu_stm = torch.ones((n_sample, time_len, N_STOCK)) * torch.tensor([[2.99, 3.71, 3.55]])` |
+| endowment volatility parameter | <img src="https://latex.codecogs.com/svg.image?\begin{bmatrix}&space;-2.07&&space;1.91&space;&&space;0.64&space;\\&space;1.91&&space;&space;-1.77&&space;-0.59&space;\\&space;0.64&&space;-0.59&space;&space;&&space;&space;-0.20\\\end{bmatrix}\times&space;10^9" />| `xi_dd = torch.tensor([[ -2.07, 1.91, 0.64],[1.91, -1.77, -0.59],[0.64 ,-0.59 ,-0.20]]) *1e9` |
+| trading cost parameter |<img src="https://latex.codecogs.com/svg.image?\begin{bmatrix}1.269&space;&&space;1.354&space;&&space;1.595&space;\\\end{bmatrix}\times&space;10^{-9}"/> | ` lam_mm = torch.diag(torch.tensor([0.1269, 0.1354, 0.1595])) * 1e-8`|
+
+And these lead to the optimal position (upper left panel) and the optimal trading rates illustrated below (we only include the tradings in the last 30 days), leanrt by the ST-Hedging as well as the ground truth and the Leading-order solution based on the asymptotic formula:   
+![multiple stocks position](./Gallery/quad_phi_10yr.png "position") ![multiple stocks rate1](./Gallery/quad_phidot_10yr_1.png "rate 1")
+![multiple stocks rate2](./Gallery/quad_phidot_10yr_2.png "rate 2") ![multiple stocks rate3](./Gallery/quad_phidot_10yr_3.png "rate 3")
+<br/>
+With the simulation of a test batch size of 3000 (`N_SAMPLE = 3000`), the expectation and the standard deviation of the goal function <img src="https://latex.codecogs.com/svg.latex?J_T(\dot{\varphi})"/> and the mean square error of the terminal trading rate are calculated, as summarized below:
+
+| Method | <img src="https://latex.codecogs.com/svg.image?J_T(\dot{\varphi})\pm%20\mathrm{std}"/> | <img src="https://latex.codecogs.com/svg.image?\mathbb{E}[(\dot{\varphi_T})^2/s^2]"/> | 
+| --- | ---  | --- | 
+| ST Hedging  | <img src="https://latex.codecogs.com/svg.image?1.60&space;\times&space;10^{11}&space;\pm&space;3.58&space;\times&space;10^6"/> | <img src="https://latex.codecogs.com/svg.image?\begin{pmatrix}&space;2.4&&space;4.7&space;&3.6&space;&space;\\\end{pmatrix}&space;\times&space;10^{-9}"/> | 
+| Leading Order Approximation  |  <img src="https://latex.codecogs.com/svg.image?1.60&space;\times&space;10^{11}&space;\pm&space;3.58&space;\times&space;10^6"/> | <img src="https://latex.codecogs.com/svg.image?\begin{pmatrix}&space;4.5&&space;3.5&space;&1.6&space;&space;\\\end{pmatrix}&space;\times&space;10^{-7}"/>| 
+| Ground Truth |  <img src="https://latex.codecogs.com/svg.image?1.60&space;\times&space;10^{11}&space;\pm&space;3.58&space;\times&space;10^6"/> | <img src="https://latex.codecogs.com/svg.image?\begin{pmatrix}&space;0.0&&space;0.0&space;&0.0&space;&space;\\\end{pmatrix}&space;"/>| 
+
 
 See more examples and discussion in Section 4 of paper [2].   
 

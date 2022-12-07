@@ -185,7 +185,7 @@ The trading horizon is discretized in 168 time steps (`TIME_STEP=168`). The para
 
 And these lead to the optimal trading rate (left panel) and the optimal position (right panel) illustrated below, leanrt by the FBSDE solver, the Deep Hedging, and the ST-Hedging as well as the Leading-order solution based on the asymptotic formula:   
 
-![TR=21_q=3/2](./Gallery/single_3on2_21_new.png)
+![TR=21_q=3/2](./Gallery/single_3_on_2_21_new.png)
 <br/>
 With the simulation of a test batch size of 3000 (`test_samples=3000`), the expectation and the standard deviation of the goal function <img src="https://latex.codecogs.com/svg.latex?J_T(\dot{\varphi})"/> and the mean square error of the terminal trading rate are calculated, as summarized below:
 

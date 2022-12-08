@@ -197,13 +197,12 @@ With the simulation of a test batch size of 3000 (`test_samples=3000`), the expe
 | Leading Order Approximation  |  <img src="https://latex.codecogs.com/svg.image?3.93&space;\times&space;10^{9}&space;\pm&space;2.42&space;\times&space;10^{9}&space;"/> | <img src="https://latex.codecogs.com/svg.image?1.10&space;\times&space;10^{-4}"/>| 
 
 ### Multiple Stocks
-To illustrate the scalability of our ST-Hedging algorithm, we proivde an example with three risky assets in the market with cross sectional effect.
-The trading horizon is 2520 days (`TR=2520`), discretized in 2520 time steps (`T=2520`), and the switching threshold is 100 days before maturity.
-
- The parameters are taken from the calibration in [1]:
+To illustrate the scalability of our ST-Hedging algorithm, we proivde examples with three risky assets in the market.
 
 #### Quadratic Cost
-Here we proivde an example for the quadratic cost case (`q=2`) with the trading horizon of 2520 days (`TIME=2520`).    
+Here we proivde an example with three risky assets in the market with cross sectional effect, with the quadratic cost (`q=2`). The trading horizon is 2520 days (`TR=2520`), discretized in 2520 time steps (`T=2520`), and the switching threshold is 100 days before maturity. 
+The parameters are taken from the calibration in [1]:
+
 <br/>
 
 | Parameter | Value | Code | 
@@ -215,7 +214,7 @@ Here we proivde an example for the quadratic cost case (`q=2`) with the trading 
 | endowment volatility parameter | <img src="https://latex.codecogs.com/svg.image?\begin{bmatrix}&space;-2.07&&space;1.91&space;&&space;0.64&space;\\&space;1.91&&space;&space;-1.77&&space;-0.59&space;\\&space;0.64&&space;-0.59&space;&space;&&space;&space;-0.20\\\end{bmatrix}\times&space;10^9" />| `xi_dd = torch.tensor([[ -2.07, 1.91, 0.64],[1.91, -1.77, -0.59],[0.64 ,-0.59 ,-0.20]]) *1e9` |
 | trading cost parameter |<img src="https://latex.codecogs.com/svg.image?\begin{bmatrix}&space;1.269&space;\\&space;1.354&space;\\&space;1.595\end{bmatrix}&space;\times&space;10^{-9}"/> | ` lam_mm = torch.diag(torch.tensor([0.1269, 0.1354, 0.1595])) * 1e-8`|
 
-And these lead to the optimal position (the first plot) and the optimal trading rates illustrated below (we only include the tradings in the last 30 days), leanrt by the ST-Hedging as well as the ground truth and the Leading-order solution based on the asymptotic formula:   
+And these lead to the optimal position (the first plot) and the optimal trading rates illustrated below, leanrt by the ST-Hedging as well as the ground truth and the Leading-order solution based on the asymptotic formula:   
 ![multiple stocks position](./Gallery/quad_phi_10yr.png "position") ![multiple stocks rate1](./Gallery/quad_phidot_10yr_1.png "rate 1")
 ![multiple stocks rate2](./Gallery/quad_phidot_10yr_2.png "rate 2") ![multiple stocks rate3](./Gallery/quad_phidot_10yr_3.png "rate 3")
 <br/>
@@ -228,7 +227,8 @@ With the simulation of a test batch size of 3000 (`N_SAMPLE = 3000`), the expect
 | Ground Truth |  <img src="https://latex.codecogs.com/svg.image?1.60&space;\times&space;10^{11}&space;\pm&space;3.58&space;\times&space;10^6"/> | <img src="https://latex.codecogs.com/svg.image?\begin{pmatrix}&space;0.0&&space;0.0&space;&0.0&space;&space;\\\end{pmatrix}&space;"/>| 
 
 #### Power Cost
-Here we proivde an example for the quadratic cost case (`q=3/2`) with the trading horizon of 2520 days (`TIME=2520`).    
+Here we proivde an example with three risky assets in the market, for the power cost case (`q=3/2`). The trading horizon is 2520 days (`TR=2520`), discretized in 2520 time steps (`T=2520`), and the switching threshold is 100 days before maturity. 
+The parameters are taken from the calibration in [1]:
 <br/>
 
 | Parameter | Value | Code | 
@@ -240,7 +240,7 @@ Here we proivde an example for the quadratic cost case (`q=3/2`) with the tradin
 | endowment volatility parameter | <img src="https://latex.codecogs.com/svg.image?\begin{bmatrix}&space;-2.07&&space;0&space;&&space;0&space;\\&space;0&&space;&space;-1.77&&space;0&space;\\&space;0&&space;0&space;&space;&&space;&space;-2.20\\\end{bmatrix}\times&space;10^{11}" />| `xi_dd = torch.tensor([[ -2.07, 0, 0],[0, -1.77, 0],[0 ,0 ,-2.20]]) *1e11` |
 | trading cost parameter |<img src="https://latex.codecogs.com/svg.image?\begin{bmatrix}&space;1.269&space;\\&space;1.354&space;\\&space;1.595\end{bmatrix}&space;\times&space;10^{-10}"/> | ` lam_mm = torch.diag(torch.tensor([0.1269, 0.1354, 0.1595])) * 1e-10`|
 
-And these lead to the optimal position (the first plot) and the optimal trading rates illustrated below (we only include the tradings in the last 30 days), leanrt by the ST-Hedging as well as the ground truth and the Leading-order solution based on the asymptotic formula:   
+And these lead to the optimal position (the first plot) and the optimal trading rates illustrated below, leanrt by the ST-Hedging as well as the ground truth and the Leading-order solution based on the asymptotic formula:   
 ![multiple stocks position](./Gallery/power_phi_10yr.png "position") ![multiple stocks rate1](./Gallery/power_phidot_10yr_1.png "rate 1")
 ![multiple stocks rate2](./Gallery/power_phidot_10yr_2.png "rate 2") ![multiple stocks rate3](./Gallery/power_phidot_10yr_3.png "rate 3")
 <br/>

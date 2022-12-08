@@ -1,5 +1,5 @@
 # SingleAgentPipe.py Usage
-This script solves the optimal hedging strategies of a single agent under high-dimensional settings. It can take into arbitrary number of stocks, with arbitary Brownian motion dimensions. It gives researchers the flexibility to train the deep hedging, FBSDE, pasting algorithms using deep neural networks, or simulate Browniam paths using leading order approximations and ground truth dynamics by simply tweaking a few parameters at the end of the file. The parameters and their usages are illustrated in the table below.
+This script solves the optimal hedging strategies of a single agent under high-dimensional settings. It can take into arbitrary number of stocks, with arbitary Brownian motion dimensions. It gives researchers the flexibility to train the deep hedging, FBSDE, ST-Hedging algorithms using deep neural networks, or simulate Brownian paths using leading order approximations and ground truth dynamics by simply tweaking a few parameters at the end of the file. The parameters and their usages are illustrated in the table below.
 
 | Parameter | Description | Options |
 | --- | --- | --- |

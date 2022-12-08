@@ -200,7 +200,7 @@ With the simulation of a test batch size of 3000 (`test_samples=3000`), the expe
 To illustrate the scalability of our ST-Hedging algorithm, we proivde examples with three risky assets in the market.
 
 #### Quadratic Cost
-Here we proivde an example with three risky assets in the market with cross sectional effect, with the quadratic cost (`q=2`). The trading horizon is 2520 days (`TR=2520`), discretized in 2520 time steps (`T=2520`), and the switching threshold is 100 days before maturity. 
+Here we proivde an example with three risky assets in the market with cross sectional effect, for the quadratic cost case(`q=2`). The trading horizon is 2520 days (`TR=2520`), discretized in 2520 time steps (`T=2520`), and the switching threshold is 100 days before maturity. 
 The parameters are taken from the calibration in [1]:
 
 <br/>

@@ -3,7 +3,7 @@ This script solves the optimal hedging strategies of a single agent under high-d
 
 | Parameter | Description | Options |
 | --- | --- | --- |
-| algo| The algorithm to train using deep neural networks | <strong>deep_hedging</strong>: The deep hedging algorithm that parameterizes the entire optimal hedging policy using deep neural networks.<br><strong>fbsde</strong>: The FBSDE framework where the diffusion of the transaction rate is parameterized by deep neural networks.<br><strong>pasting</strong>: The algorithm that pastes the leading order approximation in the first half and deep_heding in the second half. |
+| algo| The algorithm to train using deep neural networks | <strong>deep_hedging</strong>: The deep hedging algorithm that parameterizes the entire optimal hedging policy using deep neural networks.<br><strong>fbsde</strong>: The FBSDE framework where the diffusion of the transaction rate is parameterized by deep neural networks.<br><strong>pasting</strong>: The algorithm that pastes the leading order approximation in the first half and deep_hedging in the second half. |
 | cost| The cost function for transactions | <strong>quadratic</strong>: The transaction cost is in the power of 2.<br><strong>power</strong>: The transaction cost is in the power of 3/2. |
 | model_name | The architecture for the deep neural networks | <strong>discretized_feedforward</strong>: A list of shallow neural networks discretized at each timestamp.<br><strong>rnn</strong>: A holistic recurrent neural network that is not discretized by time. |
 | solver | The solver to use for optimization | <strong>Adam</strong>: The Adam solver.<br><strong>RMSprop</strong>: The RMSprop solver.<br><strong>SGD</strong>: The stochastic gradient descent solver. |

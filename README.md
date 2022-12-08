@@ -55,7 +55,7 @@ The general variables and the market parameters in the code are summarized below
 
 
 ## FBSDE solver
-### Case for the Single Stock
+### Case for Single Stock
 For the detailed implementation of the FBSDE solver, see [`Script/sample_code_FBSDE.py`](./Script/sample_code_FBSDE.py);      
 The core dynamic is defined in the method `System.forward()`, and the key variables in the code are summarized below:   
 | Variable | Meaning |
@@ -92,7 +92,7 @@ The core dynamic is defined in the function `fbsde_quad`, and the key variables 
 
 
 ## Deep Hedging
-### Case for the Single Stock
+### Case for Single Stock
 For the detailed implementation of the Deep Hedging, see [`Script/sample_code_Deep_Hedging.py`](./Script/sample_code_Deep_Hedging.py);   
 The core dynamic of the Deep Hedging is defined in the function `TRAIN_Utility()`, and the key variables in the code are summarized below:
 | Variable | Meaning |
@@ -140,8 +140,9 @@ The core dynamic is defined in the function `st_hedging`, and the key variables 
 
 ## Example  
 ### Single Stock
+We provide an example for each of the quadratic cost case and the power cost case.
 #### Quatratic Cost
-Here we proivde an example for the quadratic cost case (`q=2`) with the trading horizon of 21 days (`TIME=21`).    
+Here is an example for the quadratic cost case (`q=2`) with the trading horizon of 21 days (`TIME=21`).    
 <br/>
 The trading horizon is discretized in 168 time steps (`TIME_STEP=168`). The parameters are taken from the calibration in [1]:
 
@@ -170,7 +171,7 @@ With the simulation of a test batch size of 3000 (`test_samples=3000`), the expe
 | Ground Truth |  <img src="https://latex.codecogs.com/svg.image?4.13\times&space;10^9\pm&space;2.20&space;\times&space;10^9"/> | <img src="https://latex.codecogs.com/svg.image?0.0"/>| 
 
 #### 3/2 Power Cost
-Here we proivde an example for the 3/2 power cost case (`q=3/2`) with the trading horizon of 21 days (`TIME=21`).    
+Here is an example for the 3/2 power cost case (`q=3/2`) with the trading horizon of 21 days (`TIME=21`).    
 <br/>
 The trading horizon is discretized in 168 time steps (`TIME_STEP=168`). The parameters are taken from the calibration in [1]:
 
@@ -200,7 +201,7 @@ With the simulation of a test batch size of 3000 (`test_samples=3000`), the expe
 To illustrate the scalability of our ST-Hedging algorithm, we proivde examples with three risky assets in the market.
 
 #### Quadratic Cost
-Here we proivde an example with three risky assets in the market with cross sectional effect, for the quadratic cost case(`q=2`). The trading horizon is 2520 days (`TR=2520`), discretized in 2520 time steps (`T=2520`), and the switching threshold is 100 days before maturity. 
+Here is an example with three risky assets in the market with cross sectional effect, for the quadratic cost case(`q=2`). The trading horizon is 2520 days (`TR=2520`), discretized in 2520 time steps (`T=2520`), and the switching threshold is 100 days before maturity. 
 The parameters are taken from the calibration in [1]:
 
 <br/>
@@ -227,7 +228,7 @@ With the simulation of a test batch size of 3000 (`N_SAMPLE = 3000`), the expect
 | Ground Truth |  <img src="https://latex.codecogs.com/svg.image?1.60&space;\times&space;10^{11}&space;\pm&space;3.58&space;\times&space;10^6"/> | <img src="https://latex.codecogs.com/svg.image?\begin{pmatrix}&space;0.0&&space;0.0&space;&0.0&space;&space;\\\end{pmatrix}&space;"/>| 
 
 #### Power Cost
-Here we proivde an example with three risky assets in the market, for the power cost case (`q=3/2`). The trading horizon is 2520 days (`TR=2520`), discretized in 2520 time steps (`T=2520`), and the switching threshold is 100 days before maturity. 
+Here is an example with three risky assets in the market, for the power cost case (`q=3/2`). The trading horizon is 2520 days (`TR=2520`), discretized in 2520 time steps (`T=2520`), and the switching threshold is 100 days before maturity. 
 The parameters are taken from the calibration in [1]:
 <br/>
 

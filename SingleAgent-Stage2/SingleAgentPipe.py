@@ -18,11 +18,11 @@ from tqdm import tqdm
 import sys
 
 ## TODO: Adjust these global constants:
-T = 504#1008#10080#5040 #2520 #5000 #
-TR = 252#2520 #???
-N_SAMPLE = 128#3000#128
+T = 100 #5040#1008#10080#5040 #2520 #5000 #
+TR = 100 #2520#2520 #???
+N_SAMPLE = 1000 #3000#3000#128
 POWER = 2 #3/2
-N_STOCK = 3 # 1
+N_STOCK = 1 # 3 # 1
 HIGH_DIM = N_STOCK > 1
 
 if HIGH_DIM:
@@ -54,17 +54,17 @@ def get_constants_high_dim(dW_std, W_s0d = None):
     W_std = torch.cumsum(torch.cat((W_0, dW_std.cpu()), dim=1), dim=1)
     
     mu_stm = torch.ones((n_sample, time_len, N_STOCK)) * torch.tensor([[2.99, 3.71, 3.55]]) #torch.tensor([[2.99, 3.71, 3.55]]).repeat(T,1)
-    sigma_big = torch.tensor([[72.00, 71.49, 54.80],[71.49, 85.42, 65.86],[54.80, 65.86, 56.84]])
-#    sigma_big = torch.tensor([[72.00, 0, 0],[0, 85.42, 0],[0, 0, 56.84]])
+#    sigma_big = torch.tensor([[72.00, 71.49, 54.80],[71.49, 85.42, 65.86],[54.80, 65.86, 56.84]])
+    sigma_big = torch.tensor([[72.00, 0, 0],[0, 85.42, 0],[0, 0, 56.84]])
     sigma_md = solve_sigma_md_theoretical(sigma_big) #torch.ones((T, N_STOCK, N_BM)) #???
     sigma_stmd = torch.ones((n_sample, time_len, N_STOCK, N_BM)) * sigma_md
     s_tm = torch.ones((time_len, N_STOCK))
-    xi_dd = torch.tensor([[ -2.07, 1.91, 0.64],[1.91, -1.77, -0.59],[0.64 ,-0.59 ,-0.20]]) *1e9 / COEF_
+#    xi_dd = torch.tensor([[ -2.07, 1.91, 0.64],[1.91, -1.77, -0.59],[0.64 ,-0.59 ,-0.20]]) *1e9 / COEF_
     #xi_dd = torch.tensor([[ -2.07, 1.91, 1.64],[1.91, -1.77, -1.59],[1.64 ,-1.59 ,-1.20]]) *1e9 / COEF_
 #    xi_dd = torch.tensor([[ -2.07, 1.91, 1.64],[1.91, -1.77, -1.89],[1.64 ,-1.89 ,-1.90]]) *1e9 / COEF_
-#    xi_dd = torch.tensor([[2.07, 0, 0],[0, 1.77, 0],[0 , 0, -2.20]]) *1e9 / COEF_ * 100
+    xi_dd = torch.tensor([[2.07, 0, 0],[0, 1.77, 0],[0 , 0, -2.20]]) *1e9 / COEF_ * 100
 #    lam_mm = torch.diag(torch.tensor([0.1269, 0.3354, 0.8595])) * 1e-8 * COEF_ * 0.01 #torch.ones((N_STOCK, N_STOCK))
-    lam_mm = torch.diag(torch.tensor([0.1269, 0.1354, 0.1595])) * 1e-8 * COEF_ #* 0.01 #torch.ones((N_STOCK, N_STOCK))
+    lam_mm = torch.diag(torch.tensor([0.1269, 0.1354, 0.1595])) * 1e-8 * COEF_ * 0.01 #torch.ones((N_STOCK, N_STOCK))
     alpha_md = sigma_md.clone() #torch.ones((N_STOCK, N_BM)) #???
     beta_m = torch.ones(N_STOCK) #???
 
@@ -223,7 +223,7 @@ class ModelFactory:
     def __init__(self, algo, model_name, input_dim, hidden_lst, output_dim, lr, decay, scheduler_step, solver = "Adam", retrain = False, pasting_cutoff = 0, pasting_T = None):
         assert solver in ["Adam", "SGD", "RMSprop"]
         assert model_name in ["discretized_feedforward", "rnn"]
-        assert algo in ["deep_hedging", "fbsde", "pasting"]
+        assert algo in ["deep_hedging", "fbsde", "pasting", "strategy_iteration"]
         self.lr = lr
         self.decay = decay
         self.scheduler_step = scheduler_step
@@ -308,7 +308,12 @@ class ModelFactory:
             return None, None
         ts = ts_lst[0]
 
-        model = torch.load(f"{drive_dir}/Models/{self.algo}_{self.model_name}__{ts}.pt")
+        #model = torch.load(f"{drive_dir}/Models/{self.algo}_{self.model_name}__{ts}.pt")
+        model = torch.load(
+            f"{drive_dir}/Models/{self.algo}_{self.model_name}__{ts}.pt",
+            map_location=DEVICE,
+            weights_only=False,   # <-- key
+        )
         model = model.to(device = DEVICE)
         return model, ts
 
@@ -343,8 +348,8 @@ class DynamicsFactory():
         return self.W_std, self.mu_stm, self.sigma_stmd, self.s_tm, self.xi_dd, self.lam_mm, self.alpha_md, self.beta_m
     
     def mat_frac_pow(self, mat, power):
-        evals, evecs = torch.eig(mat, eigenvectors = True)
-        mat_ret = torch.matmul(evecs, torch.matmul(torch.diag(evals[:,0] ** power), torch.inverse(evecs)))
+        evals, evecs = torch.linalg.eigh(mat)
+        mat_ret = evecs @ torch.diag(evals.real ** power) @ torch.linalg.inv(evecs) #torch.matmul(evecs, torch.matmul(torch.diag(evals[:,0] ** power), torch.inverse(evecs)))
         return mat_ret
     
     ## TODO: Implement it -- Daran Xu
@@ -545,18 +550,19 @@ class DynamicsFactory():
         phi_dot_stm = torch.zeros((self.n_sample, self.T, N_STOCK)).to(device = DEVICE)
         for t in range(self.T):
             tanh_inner = self.const_mm / T * (self.T - t - 1) * TR
-            evals, evecs = torch.eig(tanh_inner, eigenvectors = True)
-            norm_fac = torch.sum(evals[:,0] ** 2) ** 0.5 + 1e-9
-            tanh_exp = torch.matmul(evecs, torch.matmul(torch.diag(torch.exp(evals[:,0] / norm_fac)), torch.inverse(evecs)))
-            tanh_exp_neg = torch.matmul(evecs, torch.matmul(torch.diag(torch.exp(evals[:,0] / norm_fac * (1 - 2 * norm_fac))), torch.inverse(evecs)))
+            evals, evecs = torch.linalg.eigh(tanh_inner)
+            norm_fac = torch.linalg.norm(evals, dim=-1) + 1e-9  #torch.sum(evals[:,0] ** 2) ** 0.5 + 1e-9
+            tanh_exp = torch.matmul(evecs, torch.matmul(torch.diag(torch.exp(evals / norm_fac)), torch.inverse(evecs))) #torch.matmul(evecs, torch.matmul(torch.diag(torch.exp(evals[:,0] / norm_fac)), torch.inverse(evecs)))
+            tanh_exp_neg = torch.matmul(evecs, torch.matmul(torch.diag(torch.exp(evals / norm_fac * (1 - 2 * norm_fac))), torch.inverse(evecs))) #torch.matmul(evecs, torch.matmul(torch.diag(torch.exp(evals[:,0] / norm_fac * (1 - 2 * norm_fac))), torch.inverse(evecs)))
             tanh_tmp = torch.inverse(tanh_exp_neg + tanh_exp) @ (tanh_exp - tanh_exp_neg) #1 - 2 * torch.inverse(tanh_exp + 1)
             phi_dot_stm[:,t,:] = -(phi_stm[:,t,:] - self.phi_stm_bar[:,t,:]) @ self.lam_mm_negHalf @ self.const_mm @ self.lam_mm_half @ tanh_tmp #torch.tanh(self.const_mm * (T - t) / T * TR).T
             phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] * (self.ts_lst[t + 1] - self.ts_lst[t])
         return phi_dot_stm, phi_stm
     
     ## TODO: Implement it -- Zhanhao Zhang
-    def deep_hedging(self, model, time_len = T, phi_0 = None, start_t = 0, dt = TR / T):
+    def deep_hedging(self, model, return_delta_phi = False, time_len = T, phi_0 = None, start_t = 0, dt = TR / T):
         phi_stm = torch.zeros((self.n_sample, time_len + 1, N_STOCK)).to(device = DEVICE)
+        delta_phi_stm = torch.zeros((self.n_sample, time_len, N_STOCK)).to(device = DEVICE)
         if phi_0 is None:
             phi_stm[:,0,:] = self.phi_stm_bar[:,0,:] #S_OUTSTANDING / 2
         else:
@@ -573,9 +579,12 @@ class DynamicsFactory():
 #                x = torch.cat((phi_stm[:,t,:], xi * self.W_std[:,t + start_t,:], curr_t * t_coef), dim = 1)
             x = phi_stm[:,t,:] - self.phi_stm_bar[:,start_t + t,:]
             phi_dot_stm[:,t,:] = model((t, x))
+            delta_phi_stm[:,t,:] = x
 #            phi_dot_stm[:,t,-1] = -torch.sum(phi_dot_stm[:,t,:-1])
             phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] * (self.ts_lst[t + start_t + 1] - self.ts_lst[t + start_t])
-        return phi_dot_stm, phi_stm
+        if not return_delta_phi:
+            return phi_dot_stm, phi_stm
+        return phi_dot_stm, phi_stm, delta_phi_stm
     
     ## TODO: Implement it -- Zhanhao Zhang
     def random_deep_hedging(self, model, time_len = T, phi_0 = None, dt = TR / T):
@@ -683,6 +692,37 @@ class LossFactory():
         Value=phi_dot_stm[:,-1,:]
         Target=torch.zeros_like(Value,device=DEVICE)
         return self.mse_loss_func(Value,Target) #torch.mean(torch.abs(Value - Target)) #
+    
+    def hamiltonian_loss(self, phi_dot_stm, delta_phi_stm):
+        ## Compute Y
+        Y_stm = -GAMMA * torch.flip(
+            torch.cumsum(torch.flip(delta_phi_stm, dims=[1]), dim=1),
+            dims=[1]
+        )
+        h_stm = 0.1 #self.max_h(phi_dot_stm, Y_stm)
+        phi_dot_target_stm = phi_dot_stm + h_stm * (Y_stm - phi_dot_stm)
+        loss = torch.mean((phi_dot_stm - phi_dot_target_stm) ** 2)
+        return loss
+    
+    def max_h(self, alpha, Y, eps = 0.2, h_cap=0.1, tiny=1e-12, p=2):
+        """
+        Compute max step size h s.t. ||alpha_{t+1} - alpha_t|| < eps.
+
+        alpha, Y: torch.Tensor (scalar or vector)
+        eps: float or scalar tensor
+        h_cap: upper bound on h (e.g. 1.0)
+        p: norm degree (default L2)
+        """
+        delta = Y - alpha
+
+        if delta.ndim == 0:  # scalar
+            mag = delta.abs()
+        else:               # vector
+            mag = torch.norm(delta, p=p)
+
+        # avoid division by zero
+        h = eps / (mag + tiny)
+        return torch.clamp(h, max=h_cap)
 
 
 ## Write training logs to file
@@ -805,7 +845,7 @@ def Visualize_dyn_comp(timestamps, arr_lst, ts, name, algo_lst, comment = None):
 
 ## The training pipeline
 def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "discretized_feedforward", solver = "Adam", hidden_lst = [50], lr = 1e-2, epoch = 1000, decay = 0.1, scheduler_step = 10000, retrain = False, pasting_cutoff = 0, n_sample = N_SAMPLE, pasting_T = None, pasting_algo = "deep_hedging", train_freq = 1, train_cut = 10, **kargs):
-    assert algo in ["deep_hedging", "fbsde", "pasting"]
+    assert algo in ["deep_hedging", "fbsde", "pasting", "strategy_iteration"]
     assert pasting_algo in ["deep_hedging", "fbsde"]
     assert cost in ["quadratic", "power"]
     assert model_name in ["discretized_feedforward", "rnn"]
@@ -890,6 +930,9 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         if algo == "deep_hedging":
             phi_dot_stm, phi_stm = dynamic_factory.deep_hedging(model)
             loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power)
+        if algo == "strategy_iteration":
+            phi_dot_stm, phi_stm, delta_phi_stm = dynamic_factory.deep_hedging(model, return_delta_phi = True)
+            loss = loss_factory.hamiltonian_loss(phi_dot_stm, delta_phi_stm)
         elif algo == "fbsde":
             if cost == "quadratic":
                 phi_dot_stm, phi_stm, Y_stm = dynamic_factory.fbsde_quad(model)
@@ -944,7 +987,7 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
     return model, loss_arr, prev_ts, curr_ts
 
 def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "quadratic", visualize_obs = 0, pasting_cutoff = 0, phi_0 = None, W_s0d = None, is_arr = False, pasting_T = None, time_lst = None, pasting_algo = "deep_hedging", report = False):
-    assert algo in ["deep_hedging", "fbsde", "pasting", "leading_order", "ground_truth"]
+    assert algo in ["deep_hedging", "fbsde", "pasting", "leading_order", "ground_truth", "strategy_iteration"]
     assert cost in ["quadratic", "power"]
     if cost == "quadratic":
         power = 2
@@ -963,7 +1006,7 @@ def evaluation(dW_std, curr_ts, model = None, algo = "deep_hedging", cost = "qua
         dt = (T - pasting_cutoff) / T * TR / pasting_T
     else:
         dt = TR / T
-    if algo == "deep_hedging":
+    if algo == "deep_hedging" or algo == "strategy_iteration":
         phi_dot_stm, phi_stm = dynamic_factory.deep_hedging(model, phi_0 = phi_0, dt = dt)
     elif algo == "fbsde":
         if cost == "quadratic":
@@ -1145,20 +1188,20 @@ else:
 
 ## TODO: Adjust the arguments for training
 train_args = {
-    "algo": "pasting",
+    "algo": "strategy_iteration",#"pasting",
     "cost": cost,
     "model_name": "discretized_feedforward",
     "solver": "Adam",
     "hidden_lst": [10, 10, 10],#[50, 50, 50],
     "lr": 1e-3,
-    "epoch": 20000,
+    "epoch": 10000,#20000,
     "train_freq": 1,
     "train_cut": 10,
     "decay": 0.1,
-    "scheduler_step": 200000,
+    "scheduler_step": 5000,
     "retrain": False,
-    "pasting_cutoff": 444,#4980,#4990,#454,#908,#9880,#4940, #404,#,#2510, #4800,
-    "pasting_T": 60,#200,#100,#40, #160, # None
+    "pasting_cutoff": 4990,#4980,#4990,#454,#908,#9880,#4940, #404,#,#2510, #4800,
+    "pasting_T": None,#50,#200,#100,#40, #160, # None
     "pasting_algo": "deep_hedging",
     "n_sample": N_SAMPLE
 }
@@ -1190,7 +1233,7 @@ else:
 
 #Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_algo[0,1:,0], phi_stm_ground_truth[0,1:,0]], curr_ts, "phi", [train_args["algo"], "ground_truth"])
 #Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_algo[0,:,0], phi_dot_stm_ground_truth[0,:,0]], curr_ts, "phi_dot", [train_args["algo"], "ground_truth"])
-vis_start = 400#400#900#9800#4900#400# #2400#4500
+vis_start = 0#4900#400#900#9800#4900#400# #2400#4500
 vis_obs = 1
 if train_args["algo"] == "pasting":
     day = int(TR - train_args["pasting_cutoff"] / T * TR)

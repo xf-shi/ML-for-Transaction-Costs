@@ -560,7 +560,7 @@ class DynamicsFactory():
         return phi_dot_stm, phi_stm
     
     ## TODO: Implement it -- Zhanhao Zhang
-    def deep_hedging(self, model, return_delta_phi = False, time_len = T, phi_0 = None, start_t = 0, dt = TR / T):
+    def deep_hedging(self, model, return_data = False, time_len = T, phi_0 = None, start_t = 0, dt = TR / T):
         phi_stm = torch.zeros((self.n_sample, time_len + 1, N_STOCK)).to(device = DEVICE)
         delta_phi_stm = torch.zeros((self.n_sample, time_len, N_STOCK)).to(device = DEVICE)
         if phi_0 is None:
@@ -582,7 +582,7 @@ class DynamicsFactory():
             delta_phi_stm[:,t,:] = x
 #            phi_dot_stm[:,t,-1] = -torch.sum(phi_dot_stm[:,t,:-1])
             phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] * (self.ts_lst[t + start_t + 1] - self.ts_lst[t + start_t])
-        if not return_delta_phi:
+        if not return_data:
             return phi_dot_stm, phi_stm
         return phi_dot_stm, phi_stm, delta_phi_stm
     
@@ -693,17 +693,16 @@ class LossFactory():
         Target=torch.zeros_like(Value,device=DEVICE)
         return self.mse_loss_func(Value,Target) #torch.mean(torch.abs(Value - Target)) #
     
-    def hamiltonian_loss(self, phi_dot_stm, delta_phi_stm):
+    def hamiltonian_target(self, phi_dot_stm, delta_phi_stm, h = 1e-2):
         ## Compute Y
         Y_stm = -GAMMA * torch.flip(
             torch.cumsum(torch.flip(delta_phi_stm, dims=[1]), dim=1),
             dims=[1]
         )
-        h_stm = 1 #0.1 #self.max_h(phi_dot_stm, Y_stm)
+        h_stm = h #self.max_h(phi_dot_stm, Y_stm)
         with torch.no_grad():
             phi_dot_target_stm = phi_dot_stm + h_stm * (Y_stm - phi_dot_stm)
-        loss = torch.mean((phi_dot_stm - phi_dot_target_stm) ** 2)
-        return loss
+        return phi_dot_target_stm
     
     def max_h(self, alpha, Y, eps = 0.2, h_cap=0.1, tiny=1e-12, p=2):
         """
@@ -845,7 +844,7 @@ def Visualize_dyn_comp(timestamps, arr_lst, ts, name, algo_lst, comment = None):
         plt.close()
 
 ## The training pipeline
-def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "discretized_feedforward", solver = "Adam", hidden_lst = [50], lr = 1e-2, epoch = 1000, decay = 0.1, scheduler_step = 10000, retrain = False, pasting_cutoff = 0, n_sample = N_SAMPLE, pasting_T = None, pasting_algo = "deep_hedging", train_freq = 1, train_cut = 10, **kargs):
+def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "discretized_feedforward", solver = "Adam", hidden_lst = [50], lr = 1e-2, epoch = 1000, decay = 0.1, scheduler_step = 10000, retrain = False, pasting_cutoff = 0, n_sample = N_SAMPLE, pasting_T = None, pasting_algo = "deep_hedging", train_freq = 1, train_cut = 10, num_gradient_steps = 1, SI_h = 0.01, **kargs):
     assert algo in ["deep_hedging", "fbsde", "pasting", "strategy_iteration"]
     assert pasting_algo in ["deep_hedging", "fbsde"]
     assert cost in ["quadratic", "power"]
@@ -871,32 +870,12 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         output_dim = N_STOCK
         input_dim = N_STOCK #N_BM + N_STOCK + 1
     if algo == "pasting":
-#        multi_normal = MultivariateNormal(torch.zeros((n_sample, T - pasting_cutoff, N_BM)), BM_COV * TR / T)
         dt = (T - pasting_cutoff) / T * TR / pasting_T
         multi_normal = MultivariateNormal(torch.zeros((n_sample, pasting_T + 1, N_BM)), BM_COV * dt)
-#        if n_sample != N_SAMPLE:
-#        torch.manual_seed(0)
-#        MULTI_NORMAL_CURR = MultivariateNormal(torch.zeros((n_sample, train_cut, N_BM)), BM_COV * TR / T)
-#        MULTI_NORMAL_CURR = MultivariateNormal(torch.zeros((n_sample, T, N_BM)), BM_COV * TR / T)
-#        dW_STD_curr = MULTI_NORMAL_CURR.sample().to(device = DEVICE)
-##        dW_STD_curr[:,:pasting_cutoff,:] = dW_STD_curr[0,:pasting_cutoff,:]
-#        W_STD_curr, _, _, _, _, _, _, _ = get_constants(dW_STD_curr)
-##        else:
-##            dW_STD_curr, W_STD_curr = dW_STD, W_STD
-#
-#        cut = min(train_cut, pasting_cutoff)
-#        W_s0d = W_STD_curr[:, cut + 1, :].reshape((n_sample, 1, N_BM)).cpu()
-#
         if pasting_T is None:
             time_lst = TIMESTAMPS[:(T - pasting_cutoff + 1 + 1)]
         else:
             time_lst = np.linspace(0, (T - pasting_cutoff) / T * TR + dt, pasting_T + 1 + 1)
-#        dynamic_factory = DynamicsFactory(TIMESTAMPS, dW_STD_curr, None, g_dir = f"{drive_dir}/eva.txt")
-#        if cost == "quadratic":
-#            phi_dot_stm_leading_order, phi_stm_leading_order = dynamic_factory.leading_order_quad()
-#        else:
-#            phi_dot_stm_leading_order, phi_stm_leading_order = dynamic_factory.leading_order_power(POWER)
-#        phi_0_leading = phi_stm_leading_order[:, cut + 1,:]
     else:
         multi_normal = MULTI_NORMAL
         time_lst = TIMESTAMPS
@@ -910,30 +889,31 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         optimizer.zero_grad()
         ## TODO: Implement it
         dW_std = multi_normal.sample().to(device = DEVICE)
-#        if algo == "pasting":
-#            dW_STD_curr = MULTI_NORMAL_CURR.sample().to(device = DEVICE)
-#            W_STD_curr, _, _, _, _, _, _, _ = get_constants(dW_STD_curr)
-#            cut = min(train_cut, pasting_cutoff)
-#            W_s0d = W_STD_curr[:, -1, :].reshape((n_sample, 1, N_BM)).cpu()
-#
-#            dynamic_factory2 = DynamicsFactory(TIMESTAMPS[:(train_cut + 1)], dW_STD_curr, None, g_dir = f"{drive_dir}/eva.txt")
-#            if cost == "quadratic":
-#                phi_dot_stm_leading_order, phi_stm_leading_order = dynamic_factory2.leading_order_quad()
-#            else:
-#                phi_dot_stm_leading_order, phi_stm_leading_order = dynamic_factory2.leading_order_power(POWER)
-#            phi_0_leading = phi_stm_leading_order[:, cut,:]
-#        else:
         W_s0d = None
         phi_0_leading = None
         dynamic_factory = DynamicsFactory(time_lst, dW_std, W_s0d, g_dir = f"{drive_dir}/eva.txt")
         loss_factory = LossFactory(time_lst, dW_std, W_s0d)
+        model_factory.update_model(model)
 
         if algo == "deep_hedging":
             phi_dot_stm, phi_stm = dynamic_factory.deep_hedging(model)
             loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power)
         if algo == "strategy_iteration":
-            phi_dot_stm, phi_stm, delta_phi_stm = dynamic_factory.deep_hedging(model, return_delta_phi = True)
-            loss = loss_factory.hamiltonian_loss(phi_dot_stm, delta_phi_stm)
+            phi_dot_stm, phi_stm, delta_phi_stm = dynamic_factory.deep_hedging(model, return_data = True)
+            loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power)
+            phi_dot_target_stm = loss_factory.hamiltonian_target(phi_dot_stm, delta_phi_stm, h = SI_h)
+            delta_phi_stm = delta_phi_stm.detach()
+            model, optimizer, scheduler, prev_ts = model_factory.prepare_model()
+            for _ in tqdm(range(num_gradient_steps), leave = False):
+                optimizer.zero_grad()
+                phi_dot_stm = torch.zeros(phi_dot_stm.shape).to(device = DEVICE)
+                for t in range(phi_dot_stm.shape[1]):
+                    x = delta_phi_stm[:,t,:]
+                    phi_dot_stm[:,t,:] = model((t, x))
+                loss_mse = torch.mean((phi_dot_stm - phi_dot_target_stm) ** 2)
+                loss_mse.backward()
+                optimizer.step()
+                scheduler.step()
         elif algo == "fbsde":
             if cost == "quadratic":
                 phi_dot_stm, phi_stm, Y_stm = dynamic_factory.fbsde_quad(model)
@@ -948,12 +928,14 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         loss_tmp += loss / train_freq
         if itr % train_freq == train_freq - 1:
             loss_arr.append(float(loss_tmp.data))
-            loss_tmp.backward()
 
             if torch.isnan(loss_tmp.data):
                 break
-            optimizer.step()
-            scheduler.step()
+            
+            if algo != "strategy_iteration":
+                loss_tmp.backward()
+                optimizer.step()
+                scheduler.step()
             
             loss_tmp = torch.tensor(0.).to(device=DEVICE)
     
@@ -1195,7 +1177,9 @@ train_args = {
     "solver": "Adam",
     "hidden_lst": [50, 50, 50],#[50, 50, 50],
     "lr": 1e-3,
-    "epoch": 20000,#20000,
+    "epoch": 50, #20000,#20000,
+    "num_gradient_steps": 100,
+    "SI_h": 0.05,
     "train_freq": 1,
     "train_cut": 10,
     "decay": 0.1,

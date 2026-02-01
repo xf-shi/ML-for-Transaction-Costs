@@ -699,8 +699,9 @@ class LossFactory():
             torch.cumsum(torch.flip(delta_phi_stm, dims=[1]), dim=1),
             dims=[1]
         )
-        h_stm = 0.1 #self.max_h(phi_dot_stm, Y_stm)
-        phi_dot_target_stm = phi_dot_stm + h_stm * (Y_stm - phi_dot_stm)
+        h_stm = 1 #0.1 #self.max_h(phi_dot_stm, Y_stm)
+        with torch.no_grad():
+            phi_dot_target_stm = phi_dot_stm + h_stm * (Y_stm - phi_dot_stm)
         loss = torch.mean((phi_dot_stm - phi_dot_target_stm) ** 2)
         return loss
     

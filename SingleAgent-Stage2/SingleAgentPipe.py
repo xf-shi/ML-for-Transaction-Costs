@@ -701,7 +701,7 @@ class LossFactory():
         )
         h_stm = h #self.max_h(phi_dot_stm, Y_stm)
         with torch.no_grad():
-            phi_dot_target_stm = phi_dot_stm + h_stm * (Y_stm - phi_dot_stm)
+            phi_dot_target_stm = phi_dot_stm + h_stm * (Y_stm - self.lam_mm[0] * phi_dot_stm)
         return phi_dot_target_stm
     
     def max_h(self, alpha, Y, eps = 0.2, h_cap=0.1, tiny=1e-12, p=2):
@@ -1177,9 +1177,9 @@ train_args = {
     "solver": "Adam",
     "hidden_lst": [50, 50, 50],#[50, 50, 50],
     "lr": 1e-3,
-    "epoch": 50, #20000,#20000,
-    "num_gradient_steps": 100,
-    "SI_h": 0.05,
+    "epoch": 1000, #20000,#20000,
+    "num_gradient_steps": 200,
+    "SI_h": 1e-3,
     "train_freq": 1,
     "train_cut": 10,
     "decay": 0.1,

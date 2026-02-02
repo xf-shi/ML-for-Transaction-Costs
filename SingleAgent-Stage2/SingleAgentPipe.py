@@ -695,7 +695,8 @@ class LossFactory():
     
     def hamiltonian_target(self, phi_dot_stm, delta_phi_stm, h = 1e-2):
         ## Compute Y
-        Y_stm = -GAMMA * torch.flip(
+        sigma = 1.8788381
+        Y_stm = -GAMMA * sigma * torch.flip(
             torch.cumsum(torch.flip(delta_phi_stm, dims=[1]), dim=1),
             dims=[1]
         )
@@ -1177,9 +1178,9 @@ train_args = {
     "solver": "Adam",
     "hidden_lst": [50, 50, 50],#[50, 50, 50],
     "lr": 1e-3,
-    "epoch": 5000, #20000,#20000,
+    "epoch": 100, #20000,#20000,
     "num_gradient_steps": 100,
-    "SI_h": 1e-4,
+    "SI_h": 1e-2,
     "train_freq": 1,
     "train_cut": 10,
     "decay": 0.1,

@@ -30,11 +30,13 @@ if HIGH_DIM:
     S_OUTSTANDING = torch.tensor([1.15, 0.32, 0.23]) *1e10 / COEF_
     GAMMA = 1/(1/ (8.91*1e-13) + 1/ (4.45 * 1e-12) ) * COEF_
     BM_COV = torch.eye(3) #[[1, 0.5], [0.5, 1]]
+    SIGMA = torch.tensor([[72.00, 0, 0],[0, 85.42, 0],[0, 0, 56.84]])
 else:
     COEF_ = 245714618646 # 1e11
     S_OUTSTANDING = torch.tensor([245714618646]) / COEF_ #torch.tensor([1.15, 0.32, 0.23]) *1e10 / COEF_
     GAMMA = 1.661728e-13 * COEF_ #1/(1/ (8.91*1e-13) + 1/ (4.45 * 1e-12) ) * COEF_
     BM_COV = torch.eye(1) #torch.eye(3) #[[1, 0.5], [0.5, 1]]
+    SIGMA = 1.8788381
 ## END HERE ##
 
 TIMESTAMPS = np.linspace(0, TR, T + 1)
@@ -55,7 +57,7 @@ def get_constants_high_dim(dW_std, W_s0d = None):
     
     mu_stm = torch.ones((n_sample, time_len, N_STOCK)) * torch.tensor([[2.99, 3.71, 3.55]]) #torch.tensor([[2.99, 3.71, 3.55]]).repeat(T,1)
 #    sigma_big = torch.tensor([[72.00, 71.49, 54.80],[71.49, 85.42, 65.86],[54.80, 65.86, 56.84]])
-    sigma_big = torch.tensor([[72.00, 0, 0],[0, 85.42, 0],[0, 0, 56.84]])
+    sigma_big = SIGMA#torch.tensor([[72.00, 0, 0],[0, 85.42, 0],[0, 0, 56.84]])
     sigma_md = solve_sigma_md_theoretical(sigma_big) #torch.ones((T, N_STOCK, N_BM)) #???
     sigma_stmd = torch.ones((n_sample, time_len, N_STOCK, N_BM)) * sigma_md
     s_tm = torch.ones((time_len, N_STOCK))
@@ -81,7 +83,7 @@ def get_constants_1_dim(dW_std, W_s0d = None):
     W_std = torch.cumsum(torch.cat((W_0, dW_std.cpu()), dim=1), dim=1)
     
     mu_stm = torch.ones((n_sample, time_len, N_STOCK)) * 0.072068
-    sigma_md = torch.tensor([[1.8788381]])
+    sigma_md = torch.tensor([[SIGMA]])
     sigma_stmd = torch.ones((n_sample, time_len, N_STOCK, N_BM)) * sigma_md
     s_tm = torch.ones((time_len, N_STOCK))
     if POWER == 2:
@@ -695,8 +697,7 @@ class LossFactory():
     
     def hamiltonian_target(self, phi_dot_stm, delta_phi_stm, h = 1e-2):
         ## Compute Y
-        sigma = 1.8788381
-        Y_stm = -GAMMA * sigma * torch.flip(
+        Y_stm = -GAMMA * SIGMA * torch.flip(
             torch.cumsum(torch.flip(delta_phi_stm, dims=[1]), dim=1),
             dims=[1]
         )
@@ -1178,9 +1179,9 @@ train_args = {
     "solver": "Adam",
     "hidden_lst": [50, 50, 50],#[50, 50, 50],
     "lr": 1e-3,
-    "epoch": 100, #20000,#20000,
+    "epoch": 1000, #20000,#20000,
     "num_gradient_steps": 100,
-    "SI_h": 1e-2,
+    "SI_h": 1e-3,
     "train_freq": 1,
     "train_cut": 10,
     "decay": 0.1,

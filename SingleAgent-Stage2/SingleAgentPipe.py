@@ -703,7 +703,7 @@ class LossFactory():
         )
         h_stm = h #self.max_h(phi_dot_stm, Y_stm)
         with torch.no_grad():
-            phi_dot_target_stm = phi_dot_stm + h_stm * (Y_stm - self.lam_mm[0] * phi_dot_stm)
+            phi_dot_target_stm = phi_dot_stm + h_stm * (Y_stm - POWER / 2 * self.lam_mm[0] * phi_dot_stm ** (POWER - 1))
         return phi_dot_target_stm
     
     def max_h(self, alpha, Y, eps = 0.2, h_cap=0.1, tiny=1e-12, p=2):
@@ -900,7 +900,7 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
         if algo == "deep_hedging":
             phi_dot_stm, phi_stm = dynamic_factory.deep_hedging(model)
             loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power)
-        if algo == "strategy_iteration":
+        elif algo == "strategy_iteration":
             phi_dot_stm, phi_stm, delta_phi_stm = dynamic_factory.deep_hedging(model, return_data = True)
             loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power)
             phi_dot_target_stm = loss_factory.hamiltonian_target(phi_dot_stm, delta_phi_stm, h = SI_h)
@@ -960,13 +960,12 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
             visualize_loss(loss_arr, curr_ts, loss_truth)
         else:
             visualize_loss(loss_arr, curr_ts, loss_leading_order)
-        if algo == "pasting":
-            if cost == "quadratic":
-                Visualize_dyn_comp(time_lst[1:], [phi_stm[0,1:,:], phi_stm_leading_order[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts + "_training", "phi", [train_args["algo"], "leading_order", "ground_truth"])
-                Visualize_dyn_comp(time_lst[1:], [phi_dot_stm[0,:,:], phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts + "_training", "phi_dot", [train_args["algo"], "leading_order", "ground_truth"])
-            else:
-                Visualize_dyn_comp(time_lst[1:], [phi_stm[0,1:,:], phi_stm_leading_order[0,1:,:]], curr_ts + "_training", "phi", [train_args["algo"], "leading_order"])
-                Visualize_dyn_comp(time_lst[1:], [phi_dot_stm[0,:,:], phi_dot_stm_leading_order[0,:,:]], curr_ts + "_training", "phi_dot", [train_args["algo"], "leading_order"])
+        if cost == "quadratic":
+            Visualize_dyn_comp(time_lst[1:], [phi_stm[0,1:,:], phi_stm_leading_order[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts + "_training", "phi", [train_args["algo"], "leading_order", "ground_truth"])
+            Visualize_dyn_comp(time_lst[1:], [phi_dot_stm[0,:,:], phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts + "_training", "phi_dot", [train_args["algo"], "leading_order", "ground_truth"])
+        else:
+            Visualize_dyn_comp(time_lst[1:], [phi_stm[0,1:,:], phi_stm_leading_order[0,1:,:]], curr_ts + "_training", "phi", [train_args["algo"], "leading_order"])
+            Visualize_dyn_comp(time_lst[1:], [phi_dot_stm[0,:,:], phi_dot_stm_leading_order[0,:,:]], curr_ts + "_training", "phi_dot", [train_args["algo"], "leading_order"])
     else:
         curr_ts = "test"
     return model, loss_arr, prev_ts, curr_ts
@@ -1173,19 +1172,19 @@ else:
 
 ## TODO: Adjust the arguments for training
 train_args = {
-    "algo": "strategy_iteration",#"pasting",
+    "algo": "deep_hedging",#"strategy_iteration",#"pasting",
     "cost": cost,
     "model_name": "discretized_feedforward",
     "solver": "Adam",
     "hidden_lst": [50, 50, 50],#[50, 50, 50],
     "lr": 1e-3,
-    "epoch": 500, #20000,#20000,
+    "epoch": 20000, #500,#20000,
     "num_gradient_steps": 100,
     "SI_h": 1e-3,
     "train_freq": 1,
     "train_cut": 10,
     "decay": 0.1,
-    "scheduler_step": 50,
+    "scheduler_step": 10000, #50,
     "retrain": True,
     "pasting_cutoff": 4990,#4980,#4990,#454,#908,#9880,#4940, #404,#,#2510, #4800,
     "pasting_T": None,#50,#200,#100,#40, #160, # None
@@ -1201,6 +1200,14 @@ if train_args["algo"] == "pasting":
 else:
     model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
 model.eval()
+
+"""
+if cost == "quadratic":
+    model_dh_fname = f"deep_hedging_quad_{int(TR)}" #f"xdr_quad_{int(TR)}_1"
+else:
+    model_dh_fname = f"deep_hedging_power_{int(TR)}" #f"xdr_power_{int(TR)}_1"
+model_dh = torch.load(f"{drive_dir}/Models/{model_dh_fname}.pt", map_location=DEVICE, weights_only=False)
+
 ## TODO: Modify It!!!
 if train_args["algo"] == "pasting":
     dW_STD[:,:train_args["pasting_cutoff"],:] = dW_STD[0,:train_args["pasting_cutoff"],:]
@@ -1214,6 +1221,7 @@ if train_args["algo"] == "pasting":
         phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_eval_ground_truth = evaluation(dW_STD_transfer, curr_ts, None, algo = "ground_truth", cost = train_args["cost"], visualize_obs = 0, pasting_cutoff = train_args["pasting_cutoff"], pasting_T = train_args["pasting_T"], report = True)
 else:
     phi_dot_stm_algo, phi_stm_algo, loss_eval_algo = evaluation(dW_STD, curr_ts, model, algo = train_args["algo"], cost = train_args["cost"], visualize_obs = 0)
+    phi_dot_stm_deep_hedging, phi_stm_deep_hedging, loss_eval_deep_hedging = evaluation(dW_STD, curr_ts, model_dh, algo = "deep_hedging", cost = train_args["cost"], visualize_obs = 0)
     phi_dot_stm_leading_order, phi_stm_leading_order, loss_eval_leading_order = evaluation(dW_STD, curr_ts, None, algo = "leading_order", cost = train_args["cost"], visualize_obs = 0)
     if cost == "quadratic":
         phi_dot_stm_ground_truth, phi_stm_ground_truth, loss_eval_ground_truth = evaluation(dW_STD, curr_ts, None, algo = "ground_truth", cost = train_args["cost"], visualize_obs = 0)
@@ -1228,17 +1236,19 @@ if train_args["algo"] == "pasting":
 else:
     comment = None
 if cost == "quadratic":
-    Visualize_dyn_comp(TIMESTAMPS[(vis_start+1):], [phi_stm_algo[vis_obs,(vis_start+1):,:], phi_stm_leading_order[vis_obs,(vis_start+1):,:], phi_stm_ground_truth[vis_obs,(vis_start+1):,:]], curr_ts, "phi", [train_args["algo"], "leading_order", "ground_truth"], comment = comment)
-    Visualize_dyn_comp(TIMESTAMPS[(vis_start+1):], [phi_dot_stm_algo[vis_obs,vis_start:,:], phi_dot_stm_leading_order[vis_obs,vis_start:,:], phi_dot_stm_ground_truth[vis_obs,vis_start:,:]], curr_ts, "phi_dot", [train_args["algo"], "leading_order", "ground_truth"], comment = comment)
+    Visualize_dyn_comp(TIMESTAMPS[(vis_start+1):], [phi_stm_algo[vis_obs,(vis_start+1):,:], phi_stm_deep_hedging[vis_obs,(vis_start+1):,:], phi_stm_leading_order[vis_obs,(vis_start+1):,:], phi_stm_ground_truth[vis_obs,(vis_start+1):,:]], curr_ts, "phi", [train_args["algo"], "deep_hedging", "leading_order", "ground_truth"], comment = comment)
+    Visualize_dyn_comp(TIMESTAMPS[(vis_start+1):], [phi_dot_stm_algo[vis_obs,vis_start:,:], phi_dot_stm_deep_hedging[vis_obs,vis_start:,:], phi_dot_stm_leading_order[vis_obs,vis_start:,:], phi_dot_stm_ground_truth[vis_obs,vis_start:,:]], curr_ts, "phi_dot", [train_args["algo"], "deep_hedging", "leading_order", "ground_truth"], comment = comment)
 else:
-    Visualize_dyn_comp(TIMESTAMPS[(vis_start+1):], [phi_stm_algo[vis_obs,(vis_start+1):,:], phi_stm_leading_order[vis_obs,(vis_start+1):,:]], curr_ts, "phi", [train_args["algo"], "leading_order"], comment = comment)
-    Visualize_dyn_comp(TIMESTAMPS[(vis_start+1):], [phi_dot_stm_algo[vis_obs,vis_start:,:], phi_dot_stm_leading_order[vis_obs,vis_start:,:]], curr_ts, "phi_dot", [train_args["algo"], "leading_order"], comment = comment)
+    Visualize_dyn_comp(TIMESTAMPS[(vis_start+1):], [phi_stm_algo[vis_obs,(vis_start+1):,:], phi_stm_deep_hedging[vis_obs,(vis_start+1):,:], phi_stm_leading_order[vis_obs,(vis_start+1):,:]], curr_ts, "phi", [train_args["algo"], "deep_hedging", "leading_order"], comment = comment)
+    Visualize_dyn_comp(TIMESTAMPS[(vis_start+1):], [phi_dot_stm_algo[vis_obs,vis_start:,:], phi_dot_stm_deep_hedging[vis_obs,vis_start:,:], phi_dot_stm_leading_order[vis_obs,vis_start:,:]], curr_ts, "phi_dot", [train_args["algo"], "deep_hedging", "leading_order"], comment = comment)
 
 #Visualize_dyn_comp(TIMESTAMPS[1:], [phi_stm_leading_order[0,1:,:], phi_stm_ground_truth[0,1:,:]], curr_ts, "phi", ["leading_order", "ground_truth"])
 #Visualize_dyn_comp(TIMESTAMPS[1:], [phi_dot_stm_leading_order[0,:,:], phi_dot_stm_ground_truth[0,:,:]], curr_ts, "phi_dot", ["leading_order", "ground_truth"])
 
 write_logs([prev_ts, curr_ts], train_args)
 print(f"utility loss for {train_args['algo']}: {loss_eval_algo}")
+print(f"utility loss for deep hedging: {loss_eval_deep_hedging}")
 print(f"leading order loss: {loss_eval_leading_order}")
 if cost == "quadratic":
     print(f"ground truth loss: {loss_eval_ground_truth}")
+"""

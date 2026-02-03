@@ -18,8 +18,8 @@ from tqdm import tqdm
 import sys
 
 ## TODO: Adjust these global constants:
-T = 252 #5040#1008#10080#5040 #2520 #5000 #
-TR = 252 #2520#2520 #???
+T = 2520 #5040#1008#10080#5040 #2520 #5000 #
+TR = 2520 #2520#2520 #???
 N_SAMPLE = 1000 #3000#3000#128
 POWER = 2 #3/2
 N_STOCK = 1 # 3 # 1
@@ -1179,9 +1179,9 @@ train_args = {
     "solver": "Adam",
     "hidden_lst": [50, 50, 50],#[50, 50, 50],
     "lr": 1e-3,
-    "epoch": 200, #20000,#20000,
+    "epoch": 500, #20000,#20000,
     "num_gradient_steps": 100,
-    "SI_h": 1e-2,
+    "SI_h": 1e-3,
     "train_freq": 1,
     "train_cut": 10,
     "decay": 0.1,

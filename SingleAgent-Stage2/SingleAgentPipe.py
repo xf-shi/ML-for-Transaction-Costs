@@ -18,9 +18,9 @@ from tqdm import tqdm
 import sys
 
 ## TODO: Adjust these global constants:
-T = 2520 #5040#1008#10080#5040 #2520 #5000 #
-TR = 2520 #2520#2520 #???
-N_SAMPLE = 1000 #3000#3000#128
+T = 252 #2520 #5040#1008#10080#5040 #2520 #5000 #
+TR = 252 #2520 #2520#2520 #???
+N_SAMPLE = 128 #1000 #3000#3000#128
 POWER = 2 #2 #3/2
 N_STOCK = 1 # 3 # 1
 HIGH_DIM = N_STOCK > 1
@@ -32,11 +32,11 @@ if HIGH_DIM:
     BM_COV = torch.eye(3) #[[1, 0.5], [0.5, 1]]
     SIGMA = torch.tensor([[72.00, 0, 0],[0, 85.42, 0],[0, 0, 56.84]])
 else:
-    COEF_ = 245714618646 # 1e11
-    S_OUTSTANDING = torch.tensor([245714618646]) / COEF_ #torch.tensor([1.15, 0.32, 0.23]) *1e10 / COEF_
-    GAMMA = 1.661728e-13 * COEF_ #1/(1/ (8.91*1e-13) + 1/ (4.45 * 1e-12) ) * COEF_
+    COEF_ = 1 #245714618646 # 1e11
+    S_OUTSTANDING = torch.tensor([1.0]) #torch.tensor([245714618646]) / COEF_ #torch.tensor([1.15, 0.32, 0.23]) *1e10 / COEF_
+    GAMMA = 1.0 #1.661728e-13 * COEF_ #1/(1/ (8.91*1e-13) + 1/ (4.45 * 1e-12) ) * COEF_
     BM_COV = torch.eye(1) #torch.eye(3) #[[1, 0.5], [0.5, 1]]
-    SIGMA = 1.8788381
+    SIGMA = 1.0 #1.8788381
 ## END HERE ##
 
 TIMESTAMPS = np.linspace(0, TR, T + 1)
@@ -82,16 +82,16 @@ def get_constants_1_dim(dW_std, W_s0d = None):
         W_0 = torch.zeros((n_sample, 1, N_BM))
     W_std = torch.cumsum(torch.cat((W_0, dW_std.cpu()), dim=1), dim=1)
     
-    mu_stm = torch.ones((n_sample, time_len, N_STOCK)) * 0.072068
+    mu_stm = torch.ones((n_sample, time_len, N_STOCK)) * 2.0 #* 0.072068
     sigma_md = torch.tensor([[SIGMA]])
     sigma_stmd = torch.ones((n_sample, time_len, N_STOCK, N_BM)) * sigma_md
     s_tm = torch.ones((time_len, N_STOCK))
     if POWER == 2:
-        xi_dd = torch.tensor([[2.19]]) * 1e10 / COEF_
-        lam_mm = torch.diag(torch.tensor([1.08])) * 1e-10 * COEF_ * 1
+        xi_dd = torch.tensor([[3.0]]) #torch.tensor([[2.19]]) * 1e10 / COEF_
+        lam_mm = torch.diag(torch.tensor([0.01])) #torch.diag(torch.tensor([1.08])) * 1e-10 * COEF_ * 1
     else: # POWER = 3/2
-        xi_dd = torch.tensor([[2.33]]) * 1e10 / COEF_
-        lam_mm = torch.diag(torch.tensor([5.22])) * 1e-6 * (COEF_ ** 0.5) * 1
+        xi_dd = torch.tensor([[3.0]]) #torch.tensor([[2.33]]) * 1e10 / COEF_
+        lam_mm = torch.diag(torch.tensor([0.01])) #torch.diag(torch.tensor([5.22])) * 1e-6 * (COEF_ ** 0.5) * 1
     alpha_md = sigma_md.clone()
     beta_m = torch.ones(N_STOCK)
 
@@ -1175,19 +1175,19 @@ else:
 
 ## TODO: Adjust the arguments for training
 train_args = {
-    "algo": "strategy_iteration", #"deep_hedging", #"strategy_iteration",#"pasting",
+    "algo": "deep_hedging", #"strategy_iteration",#"pasting",
     "cost": cost,
     "model_name": "discretized_feedforward",
     "solver": "Adam",
     "hidden_lst": [50, 50, 50],#[50, 50, 50],
     "lr": 1e-3, #1e-3,
-    "epoch": 0, #20000, #500,#20000,
+    "epoch": 10000, #200, #20000, #500,#20000,
     "num_gradient_steps": 100,
-    "SI_h": 1e-3,
+    "SI_h": 1e-2,
     "train_freq": 1,
     "train_cut": 10,
     "decay": 0.1,
-    "scheduler_step": 10000, #50,
+    "scheduler_step": 5000, #50,
     "retrain": True,
     "pasting_cutoff": 4990,#4980,#4990,#454,#908,#9880,#4940, #404,#,#2510, #4800,
     "pasting_T": None,#50,#200,#100,#40, #160, # None
@@ -1204,6 +1204,7 @@ else:
     model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
 model.eval()
 
+"""
 if cost == "quadratic":
     model_dh_fname = f"deep_hedging_quad_{int(TR)}"
     model_fname = f"strategy_iteration_quad_{int(TR)}"
@@ -1256,3 +1257,4 @@ print(f"utility loss for deep hedging: {loss_eval_deep_hedging}")
 print(f"leading order loss: {loss_eval_leading_order}")
 if cost == "quadratic":
     print(f"ground truth loss: {loss_eval_ground_truth}")
+"""

@@ -21,7 +21,7 @@ import sys
 T = 2520 #5040#1008#10080#5040 #2520 #5000 #
 TR = 2520 #2520#2520 #???
 N_SAMPLE = 1000 #3000#3000#128
-POWER = 2 #3/2
+POWER = 2 #2 #3/2
 N_STOCK = 1 # 3 # 1
 HIGH_DIM = N_STOCK > 1
 
@@ -565,6 +565,7 @@ class DynamicsFactory():
     def deep_hedging(self, model, return_data = False, time_len = T, phi_0 = None, start_t = 0, dt = TR / T):
         phi_stm = torch.zeros((self.n_sample, time_len + 1, N_STOCK)).to(device = DEVICE)
         delta_phi_stm = torch.zeros((self.n_sample, time_len, N_STOCK)).to(device = DEVICE)
+        input_stm = torch.zeros((self.n_sample, time_len, N_STOCK)).to(device = DEVICE)
         if phi_0 is None:
             phi_stm[:,0,:] = self.phi_stm_bar[:,0,:] #S_OUTSTANDING / 2
         else:
@@ -574,19 +575,21 @@ class DynamicsFactory():
         xi = torch.sum(self.xi_dd)
         for t in range(time_len):
             #x = torch.cat((phi_stm[:,t,:], self.W_std[:,t + start_t,:], curr_t), dim = 1)#.to(device = DEVICE)
-            t_coef = (model.orig_len - time_len + t) #* 0.25
+            t_coef = t/T*TR #(model.orig_len - time_len + t) #* 0.25
 #            if False: #POWER == 2:
 #                x = torch.cat((phi_stm[:,t,:], xi * self.W_std[:,t + start_t,:], curr_t * t_coef, 0.072068 * torch.ones((self.n_sample, 1)).to(device = DEVICE), 1.8788381 * torch.ones((self.n_sample, 1)).to(device = DEVICE)), dim = 1)
 #            else:
 #                x = torch.cat((phi_stm[:,t,:], xi * self.W_std[:,t + start_t,:], curr_t * t_coef), dim = 1)
-            x = phi_stm[:,t,:] - self.phi_stm_bar[:,start_t + t,:]
+            delta_phi = phi_stm[:,t,:] - self.phi_stm_bar[:,start_t + t,:]
+            x = delta_phi #torch.cat((phi_stm[:,t,:], xi * self.W_std[:,t + start_t,:], curr_t * t_coef), dim = 1) #phi_stm[:,t,:] - self.phi_stm_bar[:,start_t + t,:]
             phi_dot_stm[:,t,:] = model((t, x))
-            delta_phi_stm[:,t,:] = x
+            delta_phi_stm[:,t,:] = delta_phi.detach().clone()
+            input_stm[:,t,:] = x.detach().clone()
 #            phi_dot_stm[:,t,-1] = -torch.sum(phi_dot_stm[:,t,:-1])
             phi_stm[:,t+1,:] = phi_stm[:,t,:] + phi_dot_stm[:,t,:] * (self.ts_lst[t + start_t + 1] - self.ts_lst[t + start_t])
         if not return_data:
             return phi_dot_stm, phi_stm
-        return phi_dot_stm, phi_stm, delta_phi_stm
+        return phi_dot_stm, phi_stm, input_stm, delta_phi_stm
     
     ## TODO: Implement it -- Zhanhao Zhang
     def random_deep_hedging(self, model, time_len = T, phi_0 = None, dt = TR / T):
@@ -862,7 +865,7 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
     
     ## TODO: Change the input dimension accordingly
     phi_0_leading = None
-    if algo == "deep_hedging":
+    if algo == "deep_hedging" or algo == "strategy_iteration":
         output_dim = N_STOCK
         input_dim = N_STOCK #N_BM + N_STOCK + 1
     elif algo == "fbsde":
@@ -901,7 +904,7 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
             phi_dot_stm, phi_stm = dynamic_factory.deep_hedging(model)
             loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power)
         elif algo == "strategy_iteration":
-            phi_dot_stm, phi_stm, delta_phi_stm = dynamic_factory.deep_hedging(model, return_data = True)
+            phi_dot_stm, phi_stm, input_stm, delta_phi_stm = dynamic_factory.deep_hedging(model, return_data = True)
             loss = loss_factory.utility_loss(phi_dot_stm, phi_stm, power)
             phi_dot_target_stm = loss_factory.hamiltonian_target(phi_dot_stm, delta_phi_stm, h = SI_h)
             delta_phi_stm = delta_phi_stm.detach()
@@ -909,8 +912,8 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
             for _ in tqdm(range(num_gradient_steps), leave = False):
                 optimizer.zero_grad()
                 phi_dot_stm = torch.zeros(phi_dot_stm.shape).to(device = DEVICE)
-                for t in range(phi_dot_stm.shape[1]):
-                    x = delta_phi_stm[:,t,:]
+                for t in range(input_stm.shape[1]):
+                    x = input_stm[:,t,:]
                     phi_dot_stm[:,t,:] = model((t, x))
                 loss_mse = torch.mean((phi_dot_stm - phi_dot_target_stm) ** 2)
                 loss_mse.backward()
@@ -941,7 +944,7 @@ def training_pipeline(algo = "deep_hedging", cost = "quadratic", model_name = "d
             
             loss_tmp = torch.tensor(0.).to(device=DEVICE)
     
-    if epoch > 0:
+    if epoch > 0 and not torch.isnan(loss_tmp.data):
         ## Update and save model
         model_factory.update_model(model)
         curr_ts = model_factory.save_to_file()
@@ -1172,12 +1175,12 @@ else:
 
 ## TODO: Adjust the arguments for training
 train_args = {
-    "algo": "deep_hedging",#"strategy_iteration",#"pasting",
+    "algo": "deep_hedging", #"strategy_iteration",#"pasting",
     "cost": cost,
     "model_name": "discretized_feedforward",
     "solver": "Adam",
     "hidden_lst": [50, 50, 50],#[50, 50, 50],
-    "lr": 1e-3,
+    "lr": 1e-3, #1e-3,
     "epoch": 20000, #500,#20000,
     "num_gradient_steps": 100,
     "SI_h": 1e-3,
@@ -1203,9 +1206,9 @@ model.eval()
 
 """
 if cost == "quadratic":
-    model_dh_fname = f"deep_hedging_quad_{int(TR)}" #f"xdr_quad_{int(TR)}_1"
+    model_dh_fname = f"xdr_quad_{int(TR)}_1"
 else:
-    model_dh_fname = f"deep_hedging_power_{int(TR)}" #f"xdr_power_{int(TR)}_1"
+    model_dh_fname = f"xdr_power_{int(TR)}_1"
 model_dh = torch.load(f"{drive_dir}/Models/{model_dh_fname}.pt", map_location=DEVICE, weights_only=False)
 
 ## TODO: Modify It!!!

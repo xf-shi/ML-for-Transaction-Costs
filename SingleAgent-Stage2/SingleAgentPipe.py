@@ -1175,13 +1175,13 @@ else:
 
 ## TODO: Adjust the arguments for training
 train_args = {
-    "algo": "deep_hedging", #"strategy_iteration",#"pasting",
+    "algo": "strategy_iteration", #"deep_hedging", #"strategy_iteration",#"pasting",
     "cost": cost,
     "model_name": "discretized_feedforward",
     "solver": "Adam",
     "hidden_lst": [50, 50, 50],#[50, 50, 50],
     "lr": 1e-3, #1e-3,
-    "epoch": 20000, #500,#20000,
+    "epoch": 0, #20000, #500,#20000,
     "num_gradient_steps": 100,
     "SI_h": 1e-3,
     "train_freq": 1,
@@ -1204,12 +1204,14 @@ else:
     model, loss_arr, prev_ts, curr_ts = training_pipeline(**train_args)
 model.eval()
 
-"""
 if cost == "quadratic":
-    model_dh_fname = f"xdr_quad_{int(TR)}_1"
+    model_dh_fname = f"deep_hedging_quad_{int(TR)}"
+    model_fname = f"strategy_iteration_quad_{int(TR)}"
 else:
-    model_dh_fname = f"xdr_power_{int(TR)}_1"
+    model_dh_fname = f"deep_hedging_power_{int(TR)}"
+    model_fname = f"strategy_iteration_power_{int(TR)}"
 model_dh = torch.load(f"{drive_dir}/Models/{model_dh_fname}.pt", map_location=DEVICE, weights_only=False)
+model = torch.load(f"{drive_dir}/Models/{model_fname}.pt", map_location=DEVICE, weights_only=False)
 
 ## TODO: Modify It!!!
 if train_args["algo"] == "pasting":
@@ -1254,4 +1256,3 @@ print(f"utility loss for deep hedging: {loss_eval_deep_hedging}")
 print(f"leading order loss: {loss_eval_leading_order}")
 if cost == "quadratic":
     print(f"ground truth loss: {loss_eval_ground_truth}")
-"""
